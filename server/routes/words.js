@@ -7,10 +7,16 @@ function mountWordRoutes(app) {
     res.json({ existing: findDuplicate(word_ar) });
   });
 
+  app.post("/api/duplicate", (req, res) => {
+    const { word_ar, root, part_of_speech, word_ar_paired } = req.body || {};
+    if (!word_ar) return res.status(400).json({ error: "word_ar is required" });
+    res.json({ existing: findDuplicate(word_ar, { root, part_of_speech, word_ar_paired }) });
+  });
+
   app.post("/api/words", (req, res) => {
     const { word_ar, word_ar_paired = [], root = "", part_of_speech = "", meaning = "", notes = "" } = req.body;
     if (!word_ar) return res.status(400).json({ error: "word_ar is required" });
-    const existing = findDuplicate(word_ar);
+    const existing = findDuplicate(word_ar, { root, part_of_speech, word_ar_paired });
     if (existing) {
       return res.status(409).json({ error: "DUPLICATE", existing });
     }

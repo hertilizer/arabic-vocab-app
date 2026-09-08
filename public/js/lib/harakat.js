@@ -2,10 +2,12 @@ import { $, $$, escapeHtml } from "./dom.js";
 import { state } from "./state.js";
 import { ICONS } from "./icons.js";
 
-const HARAKAT_REGEX = /[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E8\u06EA-\u06ED]/g;
+// Vowels, tanween, sukoon — not shadda, maddah, or combining hamza, which stay
+// visible when harakat are hidden because they can distinguish spellings.
+const HARAKAT_REGEX = /[\u0610-\u061A\u064B-\u0650\u0652\u0656-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E8\u06EA-\u06ED]/g;
 
 export function stripHarakat(str) {
-  return String(str ?? "").replace(HARAKAT_REGEX, "");
+  return String(str ?? "").normalize("NFC").replace(HARAKAT_REGEX, "");
 }
 
 export function displayAr(str) {

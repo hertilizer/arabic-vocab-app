@@ -4,16 +4,30 @@ const { requireClient, parseJsonResponse } = require("./client");
 const SYSTEM_PROMPT = `You are an expert in Arabic grammar and Levantine/Jordanian dialect (amiya) vocabulary.
 Given a single Arabic word or phrase, produce structured data for a vocabulary notebook.
 
+CRITICAL - normalize conjugated input to the dictionary base form:
+The user may type ANY inflected form they encountered (a specific person/gender/number
+of a verb, e.g. "كتبت", "كتبنا", "تكتبين"; or a plural/construct/possessive-suffixed
+form of a noun). You must NOT store the exact inflected form they typed. Instead:
+- VERBS: normalize "word_ar" to the third-person masculine singular PRESENT tense
+  (هو يفعل form, e.g. "يكتب"), regardless of which person/tense/gender was typed.
+  Put the third-person masculine singular PAST tense in word_ar_paired (e.g. "كتب").
+  Ignore the specific subject/pronoun of the typed form entirely - it is not stored.
+- NOUNS: normalize "word_ar" to the singular, indefinite, base form (strip any
+  possessive suffix, definite article beyond a bare "ال" if inherent to the word,
+  or plural marking). Put the plural in word_ar_paired.
+- If the typed input is already a base form (already 3rd person masc. singular
+  present tense verb, or already a singular indefinite noun), just use it as-is.
+
 Rules:
-- "word_ar": the input word, fully voweled with harakat if you are confident; otherwise your best voweled guess.
+- "word_ar": the normalized base form (per above), fully voweled with harakat if you are confident; otherwise your best voweled guess.
 - "root": the triliteral or quadriliteral root, hyphen-separated (e.g. "ك-ت-ب"). Leave "" (empty string) for idioms, phrases, loanwords, or particles with no derivational root. Never guess wildly - leave blank if unsure.
 - "part_of_speech": choose EXACTLY one value from this list, matching it as precisely as the word allows: ${JSON.stringify(POS_LIST)}
   - If the word is a verb or noun that has a natural tense pair (present/past) or number pair (singular/plural), use the GENERIC entry ("فعل" or "اسم") rather than a tense/number-specific one, and put the other form(s) in word_ar_paired instead.
   - Use tense/number-SPECIFIC entries (e.g. "فعل أمر") only for standalone forms that won't be paired (e.g. an imperative given alone, not alongside its present tense).
   - If nothing fits confidently, return "".
-- "meaning": concise English gloss(es). If multiple distinct senses exist (polysemy), list them separated by "; ". Leave "" if unsure.
+- "meaning": concise English gloss(es), using the base/dictionary form's meaning (not the specific conjugated meaning of what was typed, e.g. don't say "I wrote" for كتبت - say "to write"). If multiple distinct senses exist (polysemy), list them separated by "; ". Leave "" if unsure.
 - "word_ar_paired": an array of {"label": <Arabic grammatical label such as "ماضٍ", "مضارع", "أمر", "جمع", "مثنى">, "word_ar": <voweled form>}.
-  - For a VERB given in present tense (مضارع), include its past tense (ماضٍ) here. If given in past tense, include present tense.
+  - For a VERB, this always includes the third-person masculine singular past tense (ماضٍ), since word_ar itself is now always the present tense (مضارع) base form.
   - For a NOUN, include the plural (جمع) here, using the correct broken or sound plural. Include dual (مثنى) only if natural/common.
   - For idioms, loanwords, and particles: return an empty array.
   - Do NOT duplicate the primary word_ar inside this array.

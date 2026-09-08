@@ -31,7 +31,10 @@ async function startAddAutofill(word) {
   state.currentAddGuess = null;
 
   try {
-    const { existing } = await api(`/api/duplicate?word_ar=${encodeURIComponent(word_ar)}`);
+    const { existing } = await api("/api/duplicate", {
+      method: "POST",
+      body: JSON.stringify({ word_ar })
+    });
     if (existing) {
       openExistingWord(existing);
       return;
@@ -55,6 +58,14 @@ async function startAddAutofill(word) {
   try {
     const guess = await api("/api/autofill", { method: "POST", body: JSON.stringify({ word_ar }) });
     if (!adding) return;
+    const { existing } = await api("/api/duplicate", {
+      method: "POST",
+      body: JSON.stringify(guess)
+    });
+    if (existing) {
+      openExistingWord(existing);
+      return;
+    }
     state.currentAddGuess = guess;
     renderAddStepConfirm();
   } catch (err) {

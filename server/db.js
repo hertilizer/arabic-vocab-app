@@ -22,19 +22,36 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_words_search_blob ON words(search_blob);
 `);
 
-// Arabic diacritics (harakat, sukoon, shadda, tanween) Unicode range for stripping.
-const HARAKAT_REGEX = /[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E8\u06EA-\u06ED]/g;
+// Vowels, tanween, sukoon, and other combining marks.
+// Kept, because they can be the only difference between distinct words:
+//   shadda (U+0651)  كتب vs كتّب
+//   maddah (U+0653)  and hamza above/below (U+0654, U+0655) — NFC usually
+//   folds these into أ إ آ ؤ ئ, but un-normalized input must not lose them.
+const HARAKAT_REGEX = /[\u0610-\u061A\u064B-\u0650\u0652\u0656-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E8\u06EA-\u06ED]/g;
+const SHADDA = "\u0651";
 
 function stripHarakat(str) {
   if (!str) return "";
-  return str.replace(HARAKAT_REGEX, "");
+  return str.normalize("NFC").replace(HARAKAT_REGEX, "");
+}
+
+function stripAllMarks(str) {
+  return stripHarakat(str)
+    .replaceAll(SHADDA, "")
+    .replace(/[\u0622\u0623\u0625\u0671]/g, "ا")
+    .replace(/\u0624/g, "و")
+    .replace(/\u0626/g, "ي")
+    .replace(/\u0621/g, "");
 }
 
 // Builds the space-separated blob of every unvoweled form (primary + paired)
-// used for simple, harakat-insensitive LIKE search.
+// used for simple, harakat-insensitive LIKE search. Both identity tokens
+// (shadda + hamza kept) and folded tokens are stored so a search for كتب
+// still finds كتّب, and سال still finds سأل.
 function buildSearchBlob(word_ar, word_ar_paired) {
   const forms = [word_ar, ...(word_ar_paired || []).map((f) => f.word_ar)];
-  return forms.map(stripHarakat).filter(Boolean).join(" ");
+  const tokens = forms.flatMap((f) => [stripHarakat(f), stripAllMarks(f)]).filter(Boolean);
+  return [...new Set(tokens)].join(" ");
 }
 
 function rowToEntry(row) {
@@ -51,16 +68,69 @@ function rowToEntry(row) {
   };
 }
 
-function findDuplicate(word_ar, { excludeId } = {}) {
-  const key = stripHarakat(word_ar).trim();
-  if (!key) return null;
-  const rows = db.prepare("SELECT * FROM words WHERE search_blob LIKE ?").all(`%${key}%`);
-  for (const row of rows) {
-    if (excludeId && Number(row.id) === Number(excludeId)) continue;
-    const paired = JSON.parse(row.word_ar_paired || "[]");
-    const forms = [row.word_ar, ...paired.map((f) => f.word_ar)];
-    if (forms.some((f) => stripHarakat(f) === key)) return rowToEntry(row);
+function isVerbPos(pos) {
+  return String(pos || "").startsWith("فعل");
+}
+
+function entryForms(row) {
+  const paired = Array.isArray(row.word_ar_paired)
+    ? row.word_ar_paired
+    : JSON.parse(row.word_ar_paired || "[]");
+  return [row.word_ar, ...paired.map((f) => f.word_ar)].filter(Boolean);
+}
+
+// Peel common Levantine/MSA verb prefixes and person suffixes so
+// كتبت / يكتب / بكتب collapse to the same core (كتب).
+function verbCore(word) {
+  let s = stripHarakat(word).trim();
+  if (!s) return "";
+  const prefixes = ["عم", "رح", "بي", "بت", "بن", "ب", "ي", "ت", "ن", "أ", "ا", "ح"];
+  for (const p of prefixes) {
+    if (s.startsWith(p) && s.length - p.length >= 3) {
+      s = s.slice(p.length);
+      break;
+    }
   }
+  const suffixes = ["تما", "تمو", "تون", "تم", "تن", "تي", "وا", "ون", "ين", "ان", "نا", "ت", "ن", "ا", "و"];
+  suffixes.sort((a, b) => b.length - a.length);
+  for (const suf of suffixes) {
+    if (s.endsWith(suf) && s.length - suf.length >= 3) {
+      s = s.slice(0, -suf.length);
+      break;
+    }
+  }
+  return s;
+}
+
+function findDuplicate(word_ar, { excludeId, root = "", part_of_speech = "", word_ar_paired = [] } = {}) {
+  const incoming = [word_ar, ...(word_ar_paired || []).map((f) => f.word_ar)].filter(Boolean);
+  if (!incoming.length) return null;
+
+  const skip = (row) => excludeId && Number(row.id) === Number(excludeId);
+
+  for (const form of incoming) {
+    const key = stripHarakat(form).trim();
+    if (!key) continue;
+    const rows = db.prepare("SELECT * FROM words WHERE search_blob LIKE ?").all(`%${key}%`);
+    for (const row of rows) {
+      if (skip(row)) continue;
+      if (entryForms(row).some((f) => stripHarakat(f) === key)) return rowToEntry(row);
+    }
+  }
+
+  const treatAsVerb = !part_of_speech || isVerbPos(part_of_speech);
+  if (treatAsVerb) {
+    const cores = [...new Set(incoming.map(verbCore).filter((c) => c.length >= 3))];
+    if (cores.length) {
+      const verbs = db.prepare("SELECT * FROM words WHERE part_of_speech LIKE 'فعل%'").all();
+      for (const row of verbs) {
+        if (skip(row)) continue;
+        const existingCores = entryForms(row).map(verbCore);
+        if (existingCores.some((c) => cores.includes(c))) return rowToEntry(row);
+      }
+    }
+  }
+
   return null;
 }
 
