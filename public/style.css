@@ -1,0 +1,290 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;600;700&family=Inter:wght@400;500;600&display=swap');
+
+:root {
+  --bg: #12161c;
+  --surface: #1b212a;
+  --surface-2: #232b36;
+  --border: #2e3846;
+  --text: #eef1f5;
+  --text-dim: #9aa6b5;
+  --accent: #4fb3a9;
+  --accent-2: #d99a5b;
+  --danger: #d9705b;
+  --radius: 14px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  min-height: 100vh;
+}
+
+.arabic { font-family: 'Noto Naskh Arabic', serif; }
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.brand {
+  font-family: 'Noto Naskh Arabic', serif;
+  font-size: 1.6rem;
+  margin: 0;
+  color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.searchwrap { flex: 1; }
+
+#searchInput {
+  width: 100%;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 1rem;
+  font-family: 'Noto Naskh Arabic', 'Inter', sans-serif;
+}
+#searchInput:focus { outline: 2px solid var(--accent); }
+
+.btn {
+  border: none;
+  border-radius: 10px;
+  padding: 10px 18px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  font-weight: 600;
+}
+.btn.primary { background: var(--accent); color: #06231f; }
+.btn.secondary { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
+.btn.small { padding: 6px 12px; font-size: 0.85rem; border-radius: 8px; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+#app { max-width: 1100px; margin: 0 auto; padding: 24px; }
+
+.view.hidden { display: none; }
+
+.section-block { margin-bottom: 32px; }
+.section-title {
+  font-size: 1rem;
+  color: var(--text-dim);
+  font-weight: 600;
+  margin: 0 0 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 14px;
+}
+
+.empty-note { color: var(--text-dim); font-size: 0.9rem; padding: 8px 0; }
+
+/* --- Word card (flip) --- */
+.flip-card {
+  perspective: 1000px;
+  height: 150px;
+  cursor: pointer;
+}
+.flip-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.5s;
+  transform-style: preserve-3d;
+}
+.flip-card.flipped .flip-inner { transform: rotateY(180deg); }
+
+.flip-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+}
+.flip-back { transform: rotateY(180deg); justify-content: center; align-items: center; text-align: center; }
+
+.card-top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  font-size: 0.75rem;
+}
+.root-chip {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--accent);
+  border-radius: 999px;
+  padding: 2px 9px;
+  cursor: pointer;
+  font-family: 'Noto Naskh Arabic', serif;
+}
+.root-chip:hover { border-color: var(--accent); }
+.root-chip.empty { color: var(--text-dim); font-style: italic; }
+
+.icon-btn {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 2px 4px;
+}
+.icon-btn:hover { color: var(--text); }
+
+.card-primary {
+  font-family: 'Noto Naskh Arabic', serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-top: 6px;
+  text-align: center;
+}
+.card-paired {
+  margin-top: 4px;
+  font-family: 'Noto Naskh Arabic', serif;
+  font-size: 0.95rem;
+  color: var(--text-dim);
+  text-align: center;
+}
+.card-paired .label { font-size: 0.65rem; color: var(--accent-2); margin-inline-end: 4px; font-family: 'Inter', sans-serif; }
+
+.card-bottom-row {
+  margin-top: auto;
+  display: flex;
+  justify-content: flex-end;
+}
+.reveal-btn {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+.reveal-btn:hover { color: var(--text); }
+
+.meaning-text { font-size: 1rem; padding: 0 8px; }
+.pos-label { font-size: 0.7rem; color: var(--text-dim); margin-top: 6px; }
+
+/* --- Modals --- */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 100;
+  padding: 20px;
+}
+.modal-overlay.hidden { display: none; }
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  max-width: 520px;
+  width: 100%;
+  max-height: 85vh;
+  overflow-y: auto;
+  position: relative;
+}
+.modal-close {
+  position: absolute;
+  top: 12px;
+  inset-inline-start: 12px;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 1.4rem;
+  cursor: pointer;
+  line-height: 1;
+}
+.modal-close:hover { color: var(--text); }
+
+/* --- Card detail view (inside modal) --- */
+.detail-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.detail-primary { font-family: 'Noto Naskh Arabic', serif; font-size: 2.2rem; font-weight: 700; text-align: center; margin: 12px 0 4px; }
+.detail-paired-list { text-align: center; margin-bottom: 12px; }
+.detail-paired-list .card-paired { display: inline-block; margin: 0 8px; }
+.detail-field { margin-top: 14px; }
+.detail-field label { display: block; font-size: 0.75rem; color: var(--text-dim); margin-bottom: 4px; }
+.detail-field .value { font-size: 1rem; }
+.detail-field textarea, .detail-field input, .detail-field select {
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-family: inherit;
+  font-size: 0.95rem;
+}
+.reveal-meaning-block { text-align: center; margin-top: 16px; }
+
+/* --- Add flow --- */
+.add-step h3 { margin-top: 0; }
+.field-row {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+.field-row .field-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.field-row label { font-size: 0.75rem; color: var(--text-dim); }
+.field-row input, .field-row select, .field-row textarea {
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 7px 9px;
+  font-family: inherit;
+  font-size: 0.95rem;
+}
+.paired-form-row { display: flex; gap: 6px; margin-bottom: 6px; }
+.paired-form-row input:first-child { max-width: 90px; }
+
+.note-box { margin-top: 16px; }
+.note-box textarea { min-height: 60px; }
+
+.add-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 18px;
+  gap: 10px;
+}
+
+.warn-box {
+  background: #33261a;
+  border: 1px solid #5a4126;
+  color: #e6b573;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 0.85rem;
+  margin-bottom: 14px;
+}
+
+.spinner-text { color: var(--text-dim); font-size: 0.9rem; text-align: center; padding: 20px 0; }

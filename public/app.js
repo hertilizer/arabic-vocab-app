@@ -1,0 +1,535 @@
+const state = {
+  config: { hasApiKey: false, posList: [] },
+  currentAddGuess: null, // { word_ar, root, part_of_speech, meaning, word_ar_paired }
+  currentAddWord: null
+};
+
+const $ = (sel, root = document) => root.querySelector(sel);
+const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+
+async function api(path, opts = {}) {
+  const res = await fetch(path, {
+    headers: { "Content-Type": "application/json" },
+    ...opts
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    const err = new Error(body.message || body.error || res.statusText);
+    err.status = res.status;
+    err.body = body;
+    throw err;
+  }
+  return res.status === 204 ? null : res.json();
+}
+
+// ---------- Card rendering ----------
+
+function pairedFormsHtml(paired) {
+  if (!paired || !paired.length) return "";
+  return paired
+    .map((f) => `<span class="card-paired"><span class="label">${escapeHtml(f.label)}</span>${escapeHtml(f.word_ar)}</span>`)
+    .join(" ");
+}
+
+function escapeHtml(s) {
+  return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function renderCard(entry) {
+  const el = document.createElement("div");
+  el.className = "flip-card";
+  el.dataset.id = entry.id;
+  const rootChip = entry.root
+    ? `<span class="root-chip" data-root="${escapeHtml(entry.root)}">${escapeHtml(entry.root)}</span>`
+    : `<span class="root-chip empty">—</span>`;
+
+  el.innerHTML = `
+    <div class="flip-inner">
+      <div class="flip-face flip-front">
+        <div class="card-top-row">
+          ${rootChip}
+          <button class="icon-btn" data-edit-id="${entry.id}" title="edit">✎</button>
+        </div>
+        <div class="card-primary">${escapeHtml(entry.word_ar)}</div>
+        <div>${pairedFormsHtml(entry.word_ar_paired)}</div>
+        <div class="card-bottom-row">
+          <button class="reveal-btn" data-reveal>كشف المعنى</button>
+        </div>
+      </div>
+      <div class="flip-face flip-back">
+        <div class="meaning-text">${escapeHtml(entry.meaning) || "<em>لا يوجد معنى مسجل</em>"}</div>
+        <div class="pos-label">${escapeHtml(entry.part_of_speech)}</div>
+      </div>
+    </div>
+  `;
+
+  $(".reveal-btn", el).addEventListener("click", (e) => {
+    e.stopPropagation();
+    el.classList.toggle("flipped");
+  });
+
+  const rootChipEl = $(".root-chip", el);
+  if (entry.root) {
+    rootChipEl.addEventListener("click", (e) => {
+      e.stopPropagation();
+      showRootCluster(entry.root);
+    });
+  }
+
+  $(`[data-edit-id]`, el).addEventListener("click", (e) => {
+    e.stopPropagation();
+    openCardDetail(entry.id);
+  });
+
+  el.addEventListener("click", () => openCardDetail(entry.id));
+
+  return el;
+}
+
+function renderGrid(container, entries) {
+  container.innerHTML = "";
+  if (!entries.length) {
+    container.innerHTML = `<div class="empty-note">لا توجد كلمات بعد.</div>`;
+    return;
+  }
+  entries.forEach((entry) => container.appendChild(renderCard(entry)));
+}
+
+// ---------- Views ----------
+
+function showView(id) {
+  $$(".view").forEach((v) => v.classList.add("hidden"));
+  $(`#${id}`).classList.remove("hidden");
+}
+
+async function loadHome() {
+  showView("homeView");
+  const [randomWords, recentWords] = await Promise.all([
+    api("/api/random?count=3"),
+    api("/api/words?limit=24")
+  ]);
+  renderGrid($("#randomGrid"), randomWords);
+  renderGrid($("#recentGrid"), recentWords);
+}
+
+async function showRootCluster(root) {
+  showView("resultsView");
+  $("#resultsTitle").textContent = `الجذر: ${root}`;
+  const entries = await api(`/api/root/${encodeURIComponent(root)}`);
+  renderGrid($("#resultsGrid"), entries);
+}
+
+async function runSearch(q) {
+  if (!q.trim()) {
+    loadHome();
+    return;
+  }
+  showView("resultsView");
+  $("#resultsTitle").textContent = `نتائج البحث: ${q}`;
+  const entries = await api(`/api/search?q=${encodeURIComponent(q)}`);
+  renderGrid($("#resultsGrid"), entries);
+}
+
+let searchDebounce = null;
+$("#searchInput").addEventListener("input", (e) => {
+  clearTimeout(searchDebounce);
+  const q = e.target.value;
+  searchDebounce = setTimeout(() => runSearch(q), 250);
+});
+
+$(`[data-nav="home"]`).addEventListener("click", () => {
+  $("#searchInput").value = "";
+  loadHome();
+});
+
+// ---------- Card detail modal ----------
+
+async function openCardDetail(id) {
+  const entry = await api(`/api/words/${id}`);
+  const body = $("#cardModalBody");
+  body.innerHTML = `
+    <div class="detail-header">
+      <span class="root-chip ${entry.root ? "" : "empty"}" id="detailRootChip">${escapeHtml(entry.root) || "—"}</span>
+      <button class="btn small secondary" id="detailEditToggle">تعديل</button>
+    </div>
+    <div class="detail-primary">${escapeHtml(entry.word_ar)}</div>
+    <div class="detail-paired-list">${pairedFormsHtml(entry.word_ar_paired) || `<span class="empty-note">لا توجد صيغ أخرى</span>`}</div>
+
+    <div id="detailReadOnly">
+      <div class="detail-field"><label>نوع الكلمة (part of speech)</label><div class="value">${escapeHtml(entry.part_of_speech) || "—"}</div></div>
+      <div class="detail-field"><label>ملاحظات</label><div class="value">${escapeHtml(entry.notes) || "—"}</div></div>
+      <div class="reveal-meaning-block">
+        <button class="reveal-btn" id="detailRevealMeaning">كشف المعنى</button>
+        <div class="meaning-text hidden" id="detailMeaningText" style="margin-top:10px;">${escapeHtml(entry.meaning) || "<em>لا يوجد معنى مسجل</em>"}</div>
+      </div>
+    </div>
+
+    <div id="detailEditForm" class="hidden">
+      <div class="detail-field"><label>الكلمة الأساسية</label><input id="editWordAr" value="${escapeHtml(entry.word_ar)}" /></div>
+      <div class="detail-field"><label>الجذر</label><input id="editRoot" value="${escapeHtml(entry.root)}" /></div>
+      <div class="detail-field"><label>نوع الكلمة</label>
+        <select id="editPos">
+          <option value="">—</option>
+          ${state.config.posList.map((p) => `<option value="${escapeHtml(p)}" ${p === entry.part_of_speech ? "selected" : ""}>${escapeHtml(p)}</option>`).join("")}
+        </select>
+      </div>
+      <div class="detail-field"><label>المعنى</label><textarea id="editMeaning">${escapeHtml(entry.meaning)}</textarea></div>
+      <div class="detail-field"><label>ملاحظات</label><textarea id="editNotes">${escapeHtml(entry.notes)}</textarea></div>
+      <div class="detail-field">
+        <label>الصيغ الأخرى (label = صيغة)</label>
+        <div id="editPairedList"></div>
+        <button class="btn small secondary" id="addPairedFormBtn" type="button">+ إضافة صيغة</button>
+      </div>
+      <div class="add-actions">
+        <button class="btn secondary" id="deleteEntryBtn" type="button">حذف</button>
+        <button class="btn primary" id="saveEntryBtn" type="button">حفظ</button>
+      </div>
+    </div>
+  `;
+
+  $("#detailRootChip").addEventListener("click", () => {
+    if (entry.root) {
+      closeCardModal();
+      showRootCluster(entry.root);
+    }
+  });
+
+  $("#detailRevealMeaning").addEventListener("click", () => {
+    $("#detailMeaningText").classList.toggle("hidden");
+  });
+
+  $("#detailEditToggle").addEventListener("click", () => {
+    $("#detailReadOnly").classList.add("hidden");
+    $("#detailEditForm").classList.remove("hidden");
+    renderPairedEditRows(entry.word_ar_paired);
+  });
+
+  $("#addPairedFormBtn").addEventListener("click", () => {
+    const rows = getPairedRowsFromForm();
+    rows.push({ label: "", word_ar: "" });
+    renderPairedEditRows(rows);
+  });
+
+  $("#deleteEntryBtn").addEventListener("click", async () => {
+    if (!confirm("هل تريد حذف هذه الكلمة؟")) return;
+    await api(`/api/words/${id}`, { method: "DELETE" });
+    closeCardModal();
+    loadHome();
+  });
+
+  $("#saveEntryBtn").addEventListener("click", async () => {
+    const payload = {
+      word_ar: $("#editWordAr").value.trim(),
+      root: $("#editRoot").value.trim(),
+      part_of_speech: $("#editPos").value,
+      meaning: $("#editMeaning").value.trim(),
+      notes: $("#editNotes").value.trim(),
+      word_ar_paired: getPairedRowsFromForm().filter((r) => r.word_ar.trim())
+    };
+    await api(`/api/words/${id}`, { method: "PUT", body: JSON.stringify(payload) });
+    closeCardModal();
+    loadHome();
+  });
+
+  $("#cardModal").classList.remove("hidden");
+}
+
+function renderPairedEditRows(rows) {
+  const container = $("#editPairedList");
+  container.innerHTML = "";
+  rows.forEach((r, i) => {
+    const row = document.createElement("div");
+    row.className = "paired-form-row";
+    row.innerHTML = `
+      <input data-p-label value="${escapeHtml(r.label)}" placeholder="مثال: ماضٍ" />
+      <input data-p-word value="${escapeHtml(r.word_ar)}" placeholder="الكلمة" />
+      <button class="icon-btn" data-remove-paired="${i}" type="button">✕</button>
+    `;
+    container.appendChild(row);
+  });
+  $$(`[data-remove-paired]`, container).forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const idx = parseInt(btn.dataset.removePaired);
+      rows.splice(idx, 1);
+      renderPairedEditRows(rows);
+    });
+  });
+}
+
+function getPairedRowsFromForm() {
+  return $$(".paired-form-row", $("#editPairedList")).map((row) => ({
+    label: $("[data-p-label]", row).value.trim(),
+    word_ar: $("[data-p-word]", row).value.trim()
+  }));
+}
+
+function closeCardModal() {
+  $("#cardModal").classList.add("hidden");
+}
+$("[data-close-card]").addEventListener("click", closeCardModal);
+$("#cardModal").addEventListener("click", (e) => {
+  if (e.target.id === "cardModal") closeCardModal();
+});
+
+// ---------- Add flow ----------
+
+function openAddModal() {
+  state.currentAddGuess = null;
+  state.currentAddWord = null;
+  renderAddStepInput();
+  $("#addModal").classList.remove("hidden");
+}
+
+function closeAddModal() {
+  $("#addModal").classList.add("hidden");
+}
+$("[data-close-add]").addEventListener("click", closeAddModal);
+$("#addModal").addEventListener("click", (e) => {
+  if (e.target.id === "addModal") closeAddModal();
+});
+$("#addBtn").addEventListener("click", openAddModal);
+
+function renderAddStepInput() {
+  const body = $("#addModalBody");
+  const warn = state.config.hasApiKey
+    ? ""
+    : `<div class="warn-box">لم يتم إعداد مفتاح API بعد. يمكنك إضافة الكلمة يدوياً بدون تعبئة تلقائية، أو أضف ANTHROPIC_API_KEY إلى ملف .env وأعد تشغيل الخادم.</div>`;
+  body.innerHTML = `
+    <div class="add-step">
+      <h3>إضافة كلمة جديدة</h3>
+      ${warn}
+      <div class="field-row">
+        <label>الكلمة (Arabic word)</label>
+        <input id="newWordInput" placeholder="اكتب الكلمة هنا" autofocus />
+      </div>
+      <div class="add-actions">
+        <button class="btn secondary" id="manualAddBtn" type="button">إضافة يدوياً بدون AI</button>
+        <button class="btn primary" id="autofillBtn" type="button" ${state.config.hasApiKey ? "" : "disabled"}>تعبئة تلقائية (AI)</button>
+      </div>
+    </div>
+  `;
+
+  $("#manualAddBtn").addEventListener("click", () => {
+    const word = $("#newWordInput").value.trim();
+    if (!word) return;
+    state.currentAddGuess = { word_ar: word, root: "", part_of_speech: "", meaning: "", word_ar_paired: [] };
+    renderAddStepConfirm();
+  });
+
+  $("#autofillBtn").addEventListener("click", async () => {
+    const word = $("#newWordInput").value.trim();
+    if (!word) return;
+    state.currentAddWord = word;
+    body.innerHTML = `<div class="spinner-text">جارٍ التحليل بواسطة الذكاء الاصطناعي...</div>`;
+    try {
+      const guess = await api("/api/autofill", { method: "POST", body: JSON.stringify({ word_ar: word }) });
+      state.currentAddGuess = guess;
+      renderAddStepConfirm();
+    } catch (err) {
+      renderAddStepInput();
+      alert(err.message || "حدث خطأ أثناء التعبئة التلقائية");
+    }
+  });
+}
+
+function renderAddStepConfirm() {
+  const g = state.currentAddGuess;
+  const body = $("#addModalBody");
+  body.innerHTML = `
+    <div class="add-step">
+      <h3>تأكيد الإدخال</h3>
+
+      <div class="field-row" data-field-row="word_ar">
+        <div class="field-header"><label>الكلمة (مع الحركات)</label>${retryBtn("word_ar")}</div>
+        <input data-field="word_ar" value="${escapeHtml(g.word_ar)}" />
+      </div>
+
+      <div class="field-row" data-field-row="root">
+        <div class="field-header"><label>الجذر</label>${retryBtn("root")}</div>
+        <input data-field="root" value="${escapeHtml(g.root)}" />
+      </div>
+
+      <div class="field-row" data-field-row="part_of_speech">
+        <div class="field-header"><label>نوع الكلمة</label>${retryBtn("part_of_speech")}</div>
+        <select data-field="part_of_speech">
+          <option value="">—</option>
+          ${state.config.posList.map((p) => `<option value="${escapeHtml(p)}" ${p === g.part_of_speech ? "selected" : ""}>${escapeHtml(p)}</option>`).join("")}
+        </select>
+      </div>
+
+      <div class="field-row" data-field-row="meaning">
+        <div class="field-header"><label>المعنى</label>${retryBtn("meaning")}</div>
+        <textarea data-field="meaning">${escapeHtml(g.meaning)}</textarea>
+      </div>
+
+      <div class="field-row" data-field-row="word_ar_paired">
+        <div class="field-header"><label>صيغ أخرى (مثل الماضي / الجمع)</label>${retryBtn("word_ar_paired")}</div>
+        <div id="addPairedList"></div>
+        <button class="btn small secondary" id="addPairedFormBtnAdd" type="button">+ إضافة صيغة</button>
+      </div>
+
+      <div class="field-row">
+        <label>ملاحظات</label>
+        <textarea data-field="notes"></textarea>
+      </div>
+
+      <div class="note-box">
+        <label>ملاحظة عامة لإعادة التوليد (اختياري)</label>
+        <textarea id="wholeNoteInput" placeholder="مثال: هذه كلمة عامية وليست فصحى..."></textarea>
+        <button class="btn small secondary" id="regenerateAllBtn" type="button" style="margin-top:6px;" ${state.config.hasApiKey ? "" : "disabled"}>إعادة توليد الكل بهذه الملاحظة</button>
+      </div>
+
+      <div class="add-actions">
+        <button class="btn secondary" id="cancelAddBtn" type="button">إلغاء</button>
+        <button class="btn primary" id="commitAddBtn" type="button">حفظ الكلمة</button>
+      </div>
+    </div>
+  `;
+
+  renderAddPairedRows(g.word_ar_paired || []);
+
+  $("#addPairedFormBtnAdd").addEventListener("click", () => {
+    const rows = getAddPairedRows();
+    rows.push({ label: "", word_ar: "" });
+    renderAddPairedRows(rows);
+  });
+
+  $$("[data-retry-field]").forEach((btn) => {
+    btn.addEventListener("click", () => retryField(btn.dataset.retryField));
+  });
+
+  $("#cancelAddBtn").addEventListener("click", closeAddModal);
+
+  $("#regenerateAllBtn").addEventListener("click", async () => {
+    const note = $("#wholeNoteInput").value.trim();
+    if (!note) return;
+    syncGuessFromForm();
+    body.innerHTML = `<div class="spinner-text">جارٍ إعادة التوليد...</div>`;
+    try {
+      const guess = await api("/api/autofill", {
+        method: "POST",
+        body: JSON.stringify({ word_ar: state.currentAddGuess.word_ar, note, existing: state.currentAddGuess })
+      });
+      state.currentAddGuess = { ...guess, notes: state.currentAddGuess.notes };
+      renderAddStepConfirm();
+    } catch (err) {
+      renderAddStepConfirm();
+      alert(err.message || "حدث خطأ");
+    }
+  });
+
+  $("#commitAddBtn").addEventListener("click", async () => {
+    syncGuessFromForm();
+    const payload = { ...state.currentAddGuess, word_ar_paired: getAddPairedRows().filter((r) => r.word_ar.trim()) };
+    try {
+      await api("/api/words", { method: "POST", body: JSON.stringify(payload) });
+      noteWordAdded();
+      closeAddModal();
+      loadHome();
+    } catch (err) {
+      alert(err.message || "تعذر الحفظ");
+    }
+  });
+}
+
+function retryBtn(field) {
+  return `<button class="btn small secondary" data-retry-field="${field}" type="button" ${state.config.hasApiKey ? "" : "disabled"}>إعادة المحاولة</button>`;
+}
+
+function renderAddPairedRows(rows) {
+  const container = $("#addPairedList");
+  container.innerHTML = "";
+  rows.forEach((r, i) => {
+    const row = document.createElement("div");
+    row.className = "paired-form-row";
+    row.innerHTML = `
+      <input data-ap-label value="${escapeHtml(r.label)}" placeholder="مثال: ماضٍ" />
+      <input data-ap-word value="${escapeHtml(r.word_ar)}" placeholder="الكلمة" />
+      <button class="icon-btn" data-remove-ap="${i}" type="button">✕</button>
+    `;
+    container.appendChild(row);
+  });
+  $$(`[data-remove-ap]`, container).forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const idx = parseInt(btn.dataset.removeAp);
+      rows.splice(idx, 1);
+      renderAddPairedRows(rows);
+    });
+  });
+}
+
+function getAddPairedRows() {
+  return $$(".paired-form-row", $("#addPairedList")).map((row) => ({
+    label: $("[data-ap-label]", row).value.trim(),
+    word_ar: $("[data-ap-word]", row).value.trim()
+  }));
+}
+
+function syncGuessFromForm() {
+  const g = state.currentAddGuess;
+  $$("[data-field]").forEach((el) => {
+    if (el.dataset.field && el.dataset.field !== "word_ar_paired") {
+      g[el.dataset.field] = el.value;
+    }
+  });
+  g.word_ar_paired = getAddPairedRows();
+}
+
+async function retryField(field) {
+  syncGuessFromForm();
+  const rowEl = $(`[data-field-row="${field}"]`);
+  const originalHtml = rowEl.innerHTML;
+  rowEl.innerHTML = `<div class="spinner-text">...</div>`;
+  try {
+    const result = await api("/api/autofill/field", {
+      method: "POST",
+      body: JSON.stringify({ field, word_ar: state.currentAddGuess.word_ar, existing: state.currentAddGuess })
+    });
+    state.currentAddGuess = { ...state.currentAddGuess, ...result };
+    renderAddStepConfirm();
+  } catch (err) {
+    rowEl.innerHTML = originalHtml;
+    alert(err.message || "حدث خطأ");
+  }
+}
+
+// ---------- Export (manual + auto safety net) ----------
+
+let addsSinceLastExport = 0;
+const AUTO_EXPORT_EVERY_N_ADDS = 5;
+
+function triggerExportDownload() {
+  const a = document.createElement("a");
+  a.href = "/api/export/csv";
+  a.download = "";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  addsSinceLastExport = 0;
+}
+
+$("#exportBtn").addEventListener("click", () => triggerExportDownload());
+
+function noteWordAdded() {
+  addsSinceLastExport += 1;
+  if (addsSinceLastExport >= AUTO_EXPORT_EVERY_N_ADDS) {
+    triggerExportDownload();
+  }
+}
+
+// Session-end checkpoint: if the tab is being hidden/closed and there's
+// unexported work, fire a backup export automatically.
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden" && addsSinceLastExport > 0) {
+    triggerExportDownload();
+  }
+});
+
+// ---------- Init ----------
+
+async function init() {
+  state.config = await api("/api/config");
+  loadHome();
+}
+
+init();

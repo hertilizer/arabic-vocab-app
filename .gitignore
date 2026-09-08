@@ -1,0 +1,7 @@
+node_modules/
+.env
+vocab.db
+vocab.db-journal
+vocab.db-wal
+vocab.db-shm
+*.log

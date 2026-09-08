@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>دفتري - Vocab Notebook</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <h1 class="brand" data-nav="home">دفتري</h1>
+  <div class="searchwrap">
+    <input id="searchInput" type="text" placeholder="ابحث... (search)" autocomplete="off" />
+  </div>
+  <button id="exportBtn" class="btn secondary" title="تصدير CSV">⭳ تصدير</button>
+  <button id="addBtn" class="btn primary">+ إضافة</button>
+</header>
+
+<main id="app">
+
+  <section id="homeView" class="view">
+    <div class="section-block">
+      <h2 class="section-title">كلمات عشوائية</h2>
+      <div id="randomGrid" class="grid"></div>
+    </div>
+    <div class="section-block">
+      <h2 class="section-title">أُضيفت مؤخراً</h2>
+      <div id="recentGrid" class="grid"></div>
+    </div>
+  </section>
+
+  <section id="resultsView" class="view hidden">
+    <h2 id="resultsTitle" class="section-title"></h2>
+    <div id="resultsGrid" class="grid"></div>
+  </section>
+
+</main>
+
+<!-- Card detail / edit modal -->
+<div id="cardModal" class="modal-overlay hidden">
+  <div class="modal card-modal">
+    <button class="modal-close" data-close-card>&times;</button>
+    <div id="cardModalBody"></div>
+  </div>
+</div>
+
+<!-- Add word modal -->
+<div id="addModal" class="modal-overlay hidden">
+  <div class="modal add-modal">
+    <button class="modal-close" data-close-add>&times;</button>
+    <div id="addModalBody"></div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
