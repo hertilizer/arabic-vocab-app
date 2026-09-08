@@ -1,4 +1,4 @@
-import { $, escapeHtml, addedAgo } from "./lib/dom.js";
+import { $, escapeHtml, addedAgo, entryDisplayDate } from "./lib/dom.js";
 import { api } from "./lib/api.js";
 import { state } from "./lib/state.js";
 import { ICONS, harakatBtn, quietIconBtn } from "./lib/icons.js";
@@ -206,7 +206,7 @@ export async function openCardDetail(id) {
       ${detailPairedHtml(entry.word_ar_paired)}
       ${notesBlock}
       <div class="detail-footer">
-        <span class="detail-added">${escapeHtml(addedAgo(entry.date_added))}</span>
+        <span class="detail-added">${escapeHtml(addedAgo(entryDisplayDate(entry)))}</span>
         ${quietIconBtn({ icon: ICONS.edit, label: "Edit", id: "detailEditBtn" })}
       </div>
     </div>

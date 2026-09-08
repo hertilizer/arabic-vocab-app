@@ -1,4 +1,4 @@
-import { $, $$, escapeHtml, addedAgo } from "./lib/dom.js";
+import { $, $$, escapeHtml, addedAgo, entryDisplayDate } from "./lib/dom.js";
 import { api } from "./lib/api.js";
 import { stripHarakat } from "./lib/harakat.js";
 import { ICONS } from "./lib/icons.js";
@@ -17,7 +17,7 @@ function renderCard(entry) {
   el.dataset.id = entry.id;
   el.innerHTML = `
     <div class="card-word" dir="rtl">${escapeHtml(stripHarakat(entry.word_ar))}</div>
-    <div class="card-added">${escapeHtml(addedAgo(entry.date_added))}</div>
+    <div class="card-added">${escapeHtml(addedAgo(entryDisplayDate(entry)))}</div>
   `;
   el.addEventListener("click", () => openCardDetail(entry.id));
   return el;

@@ -1,4 +1,4 @@
-import { $, $$, escapeHtml } from "./lib/dom.js";
+import { $, $$, escapeHtml, dateInputValue } from "./lib/dom.js";
 import { api } from "./lib/api.js";
 import { state } from "./lib/state.js";
 import { loadHome } from "./home.js";
@@ -13,7 +13,7 @@ function closeAddModal() {
 }
 
 function emptyGuess(word_ar) {
-  return { word_ar, root: "", part_of_speech: "", meaning: "", word_ar_paired: [] };
+  return { word_ar, root: "", part_of_speech: "", meaning: "", word_ar_paired: [], date_learned: "" };
 }
 
 async function openExistingWord(entry) {
@@ -116,6 +116,11 @@ function renderAddStepConfirm() {
         <textarea data-field="notes"></textarea>
       </div>
 
+      <div class="field-row">
+        <label>Date learned (optional)</label>
+        <input data-field="date_learned" type="date" value="${escapeHtml(dateInputValue(g.date_learned))}" />
+      </div>
+
       <div class="note-box">
         <label>Note for regenerating (optional)</label>
         <textarea id="wholeNoteInput" placeholder="e.g. This is colloquial, not MSA…"></textarea>
@@ -153,7 +158,7 @@ function renderAddStepConfirm() {
         method: "POST",
         body: JSON.stringify({ word_ar: state.currentAddGuess.word_ar, note, existing: state.currentAddGuess })
       });
-      state.currentAddGuess = { ...guess, notes: state.currentAddGuess.notes };
+      state.currentAddGuess = { ...guess, notes: state.currentAddGuess.notes, date_learned: state.currentAddGuess.date_learned };
       renderAddStepConfirm();
     } catch (err) {
       renderAddStepConfirm();

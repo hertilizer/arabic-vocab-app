@@ -1,4 +1,4 @@
-import { $, $$, escapeHtml } from "./lib/dom.js";
+import { $, $$, escapeHtml, dateInputValue } from "./lib/dom.js";
 import { api } from "./lib/api.js";
 import { state } from "./lib/state.js";
 import { loadHome } from "./home.js";
@@ -20,6 +20,7 @@ export async function openEditModal(entryOrId) {
       </div>
       <div class="detail-field"><label>Meaning</label><textarea id="editMeaning">${escapeHtml(entry.meaning)}</textarea></div>
       <div class="detail-field"><label>Notes</label><textarea id="editNotes">${escapeHtml(entry.notes)}</textarea></div>
+      <div class="detail-field"><label>Date learned (optional)</label><input id="editDateLearned" type="date" value="${escapeHtml(dateInputValue(entry.date_learned))}" /></div>
       <div class="detail-field">
         <label>Other forms (label + Arabic)</label>
         <div id="editPairedList"></div>
@@ -54,6 +55,7 @@ export async function openEditModal(entryOrId) {
       part_of_speech: $("#editPos").value,
       meaning: $("#editMeaning").value.trim(),
       notes: $("#editNotes").value.trim(),
+      date_learned: $("#editDateLearned").value.trim(),
       word_ar_paired: getPairedRowsFromForm().filter((r) => r.word_ar.trim())
     };
     await api(`/api/words/${entry.id}`, { method: "PUT", body: JSON.stringify(payload) });

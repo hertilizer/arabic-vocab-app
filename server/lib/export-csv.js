@@ -15,7 +15,7 @@ function resolveExportDir() {
 
 function buildCsv() {
   const rows = db.prepare("SELECT * FROM words ORDER BY id ASC").all();
-  const header = ["id", "word_ar", "word_ar_paired", "root", "part_of_speech", "meaning", "notes", "date_added"];
+  const header = ["id", "word_ar", "word_ar_paired", "root", "part_of_speech", "meaning", "notes", "date_added", "date_learned"];
   const escape = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
   const lines = [header.join(",")];
   for (const r of rows) {

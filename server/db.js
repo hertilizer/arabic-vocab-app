@@ -22,6 +22,11 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_words_search_blob ON words(search_blob);
 `);
 
+const wordCols = db.prepare("PRAGMA table_info(words)").all().map((c) => c.name);
+if (!wordCols.includes("date_learned")) {
+  db.exec(`ALTER TABLE words ADD COLUMN date_learned TEXT NOT NULL DEFAULT ''`);
+}
+
 // Vowels, tanween, sukoon, and other combining marks.
 // Kept, because they can be the only difference between distinct words:
 //   shadda (U+0651)  كتب vs كتّب
@@ -64,7 +69,8 @@ function rowToEntry(row) {
     part_of_speech: row.part_of_speech,
     meaning: row.meaning,
     notes: row.notes,
-    date_added: row.date_added
+    date_added: row.date_added,
+    date_learned: row.date_learned || ""
   };
 }
 

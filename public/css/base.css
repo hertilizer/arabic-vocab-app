@@ -24,6 +24,7 @@
 
 html {
   background-color: var(--surface);
+  color-scheme: dark;
 }
 
 body {
