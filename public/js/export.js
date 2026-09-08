@@ -1,5 +1,6 @@
 import { $ } from "./lib/dom.js";
 import { api } from "./lib/api.js";
+import { ICONS } from "./lib/icons.js";
 
 let addsSinceLastExport = 0;
 const AUTO_EXPORT_EVERY_N_ADDS = 5;
@@ -10,9 +11,12 @@ async function triggerExport({ silent = false } = {}) {
     addsSinceLastExport = 0;
     if (!silent) {
       const btn = $("#exportBtn");
-      const original = btn.textContent;
-      btn.textContent = "Saved";
-      setTimeout(() => { btn.textContent = original; }, 1500);
+      btn.innerHTML = ICONS.check;
+      btn.classList.add("is-saved");
+      setTimeout(() => {
+        btn.innerHTML = ICONS.export;
+        btn.classList.remove("is-saved");
+      }, 1500);
     }
   } catch (err) {
     if (!silent) alert(err.message || "Export failed");
@@ -28,7 +32,9 @@ export function noteWordAdded() {
 }
 
 export function initExport() {
-  $("#exportBtn").addEventListener("click", () => triggerExport());
+  const btn = $("#exportBtn");
+  btn.innerHTML = ICONS.export;
+  btn.addEventListener("click", () => triggerExport());
 
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden" && addsSinceLastExport > 0) {

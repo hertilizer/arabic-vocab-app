@@ -33,6 +33,16 @@ export const ICONS = {
   close: `
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M6.5 6.5 17.5 17.5M17.5 6.5 6.5 17.5"/>
+    </svg>`,
+  export: `
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+        d="M12 4v11M8.2 11.2 12 15l3.8-3.8M5.5 20h13"/>
+    </svg>`,
+  check: `
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+        d="M5.5 12.5 10 17l8.5-9"/>
     </svg>`
 };
 

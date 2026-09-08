@@ -140,7 +140,10 @@ body {
 }
 .icon-chip.light:hover {
   color: var(--text);
-  border-color: var(--border);
+  border-color: var(--text);
+}
+.icon-chip.light.is-saved {
+  color: var(--accent-2);
 }
 
 .search-expand {
