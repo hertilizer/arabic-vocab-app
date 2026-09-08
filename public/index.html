@@ -7,10 +7,14 @@
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+<div class="shemagh-bg" aria-hidden="true"></div>
 
 <header class="topbar">
   <h1 class="brand" data-nav="home">دفتري</h1>
-  <button id="exportBtn" class="btn secondary" title="Export CSV">Export</button>
+  <div class="topbar-actions">
+    <button id="harakatToggle" class="btn secondary" type="button" aria-pressed="true">Harakat on</button>
+    <button id="exportBtn" class="btn secondary" title="Export CSV">Export</button>
+  </div>
 </header>
 
 <main id="app">
@@ -26,11 +30,11 @@
   <section id="homeView" class="view">
     <div class="section-block">
       <h2 class="section-title">Random words</h2>
-      <div id="randomGrid" class="grid"></div>
+      <div id="randomGrid" class="grid grid-random"></div>
     </div>
     <div class="section-block">
       <h2 class="section-title">Recently added</h2>
-      <div id="recentGrid" class="grid"></div>
+      <div id="recentGrid" class="grid grid-recent"></div>
     </div>
   </section>
 

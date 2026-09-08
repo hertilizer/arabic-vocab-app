@@ -1,11 +1,50 @@
 const state = {
   config: { hasApiKey: false, posList: [] },
   currentAddGuess: null, // { word_ar, root, part_of_speech, meaning, word_ar_paired }
-  currentAddWord: null
+  currentAddWord: null,
+  showHarakat: localStorage.getItem("showHarakat") !== "false"
 };
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+
+const HARAKAT_REGEX = /[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E8\u06EA-\u06ED]/g;
+
+function stripHarakat(str) {
+  return String(str ?? "").replace(HARAKAT_REGEX, "");
+}
+
+function displayAr(str) {
+  const raw = str ?? "";
+  return state.showHarakat ? raw : stripHarakat(raw);
+}
+
+function arHtml(str) {
+  const raw = str ?? "";
+  return `<span class="ar-text" data-voweled="${escapeHtml(raw)}">${escapeHtml(displayAr(raw))}</span>`;
+}
+
+function syncHarakatToggle() {
+  const btn = $("#harakatToggle");
+  btn.setAttribute("aria-pressed", String(state.showHarakat));
+  btn.textContent = state.showHarakat ? "Harakat on" : "Harakat off";
+  btn.classList.toggle("toggle-on", state.showHarakat);
+}
+
+function applyHarakatToDom() {
+  $$(".ar-text").forEach((el) => {
+    const raw = el.dataset.voweled ?? "";
+    el.textContent = displayAr(raw);
+  });
+}
+
+$("#harakatToggle").addEventListener("click", () => {
+  state.showHarakat = !state.showHarakat;
+  localStorage.setItem("showHarakat", String(state.showHarakat));
+  syncHarakatToggle();
+  applyHarakatToDom();
+});
+syncHarakatToggle();
 
 async function api(path, opts = {}) {
   const res = await fetch(path, {
@@ -27,7 +66,7 @@ async function api(path, opts = {}) {
 function pairedFormsHtml(paired) {
   if (!paired || !paired.length) return "";
   return paired
-    .map((f) => `<span class="card-paired"><span class="label">${escapeHtml(f.label)}</span>${escapeHtml(f.word_ar)}</span>`)
+    .map((f) => `<span class="card-paired"><span class="label">${escapeHtml(f.label)}</span>${arHtml(f.word_ar)}</span>`)
     .join(" ");
 }
 
@@ -35,54 +74,27 @@ function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+function addedAgo(dateAdded) {
+  if (!dateAdded) return "";
+  const iso = dateAdded.includes("T") ? dateAdded : dateAdded.replace(" ", "T") + "Z";
+  const then = new Date(iso);
+  if (Number.isNaN(then.getTime())) return "";
+  const startOf = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const days = Math.round((startOf(new Date()) - startOf(then)) / 86400000);
+  if (days <= 0) return "today";
+  if (days === 1) return "1 day ago";
+  return `${days} days ago`;
+}
+
 function renderCard(entry) {
   const el = document.createElement("div");
-  el.className = "flip-card";
+  el.className = "word-card";
   el.dataset.id = entry.id;
-  const rootChip = entry.root
-    ? `<span class="root-chip" data-root="${escapeHtml(entry.root)}">${escapeHtml(entry.root)}</span>`
-    : `<span class="root-chip empty">—</span>`;
-
   el.innerHTML = `
-    <div class="flip-inner">
-      <div class="flip-face flip-front">
-        <div class="card-top-row">
-          ${rootChip}
-          <button class="icon-btn" data-edit-id="${entry.id}" title="edit">✎</button>
-        </div>
-        <div class="card-primary" dir="rtl">${escapeHtml(entry.word_ar)}</div>
-        <div>${pairedFormsHtml(entry.word_ar_paired)}</div>
-        <div class="card-bottom-row">
-          <button class="reveal-btn" data-reveal>Reveal meaning</button>
-        </div>
-      </div>
-      <div class="flip-face flip-back">
-        <div class="meaning-text">${escapeHtml(entry.meaning) || "<em>No meaning recorded</em>"}</div>
-        <div class="pos-label">${escapeHtml(entry.part_of_speech)}</div>
-      </div>
-    </div>
+    <div class="card-word" dir="rtl">${escapeHtml(stripHarakat(entry.word_ar))}</div>
+    <div class="card-added">${escapeHtml(addedAgo(entry.date_added))}</div>
   `;
-
-  $(".reveal-btn", el).addEventListener("click", (e) => {
-    e.stopPropagation();
-    el.classList.toggle("flipped");
-  });
-
-  const rootChipEl = $(".root-chip", el);
-  if (entry.root) {
-    rootChipEl.addEventListener("click", (e) => {
-      e.stopPropagation();
-      showRootCluster(entry.root);
-    });
-  }
-
-  $(`[data-edit-id]`, el).addEventListener("click", (e) => {
-    e.stopPropagation();
-    openCardDetail(entry.id);
-  });
-
   el.addEventListener("click", () => openCardDetail(entry.id));
-
   return el;
 }
 
@@ -154,7 +166,7 @@ async function openCardDetail(id) {
       <span class="root-chip ${entry.root ? "" : "empty"}" id="detailRootChip">${escapeHtml(entry.root) || "—"}</span>
       <button class="btn small secondary" id="detailEditToggle">Edit</button>
     </div>
-    <div class="detail-primary" dir="rtl">${escapeHtml(entry.word_ar)}</div>
+    <div class="detail-primary" dir="rtl">${arHtml(entry.word_ar)}</div>
     <div class="detail-paired-list">${pairedFormsHtml(entry.word_ar_paired) || `<span class="empty-note">No other forms</span>`}</div>
 
     <div id="detailReadOnly">
@@ -541,3 +553,20 @@ async function init() {
 }
 
 init();
+
+const SHEMAGH_PARALLAX = 0.4;
+const shemaghBg = $(".shemagh-bg");
+let shemaghTick = false;
+function updateShemaghParallax() {
+  if (shemaghBg) {
+    shemaghBg.style.transform = `translate3d(0, ${-window.scrollY * SHEMAGH_PARALLAX}px, 0)`;
+  }
+  shemaghTick = false;
+}
+window.addEventListener("scroll", () => {
+  if (!shemaghTick) {
+    shemaghTick = true;
+    requestAnimationFrame(updateShemaghParallax);
+  }
+}, { passive: true });
+updateShemaghParallax();
