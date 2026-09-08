@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="en" dir="ltr">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>دفتري - Vocab Notebook</title>
+<title>دفتري</title>
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -11,21 +11,21 @@
 <header class="topbar">
   <h1 class="brand" data-nav="home">دفتري</h1>
   <div class="searchwrap">
-    <input id="searchInput" type="text" placeholder="ابحث... (search)" autocomplete="off" />
+    <input id="searchInput" type="text" placeholder="Search…" autocomplete="off" dir="auto" />
   </div>
-  <button id="exportBtn" class="btn secondary" title="تصدير CSV">⭳ تصدير</button>
-  <button id="addBtn" class="btn primary">+ إضافة</button>
+  <button id="exportBtn" class="btn secondary" title="Export CSV">Export</button>
+  <button id="addBtn" class="btn primary">+ Add</button>
 </header>
 
 <main id="app">
 
   <section id="homeView" class="view">
     <div class="section-block">
-      <h2 class="section-title">كلمات عشوائية</h2>
+      <h2 class="section-title">Random words</h2>
       <div id="randomGrid" class="grid"></div>
     </div>
     <div class="section-block">
-      <h2 class="section-title">أُضيفت مؤخراً</h2>
+      <h2 class="section-title">Recently added</h2>
       <div id="recentGrid" class="grid"></div>
     </div>
   </section>

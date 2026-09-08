@@ -50,14 +50,14 @@ function renderCard(entry) {
           ${rootChip}
           <button class="icon-btn" data-edit-id="${entry.id}" title="edit">✎</button>
         </div>
-        <div class="card-primary">${escapeHtml(entry.word_ar)}</div>
+        <div class="card-primary" dir="rtl">${escapeHtml(entry.word_ar)}</div>
         <div>${pairedFormsHtml(entry.word_ar_paired)}</div>
         <div class="card-bottom-row">
-          <button class="reveal-btn" data-reveal>كشف المعنى</button>
+          <button class="reveal-btn" data-reveal>Reveal meaning</button>
         </div>
       </div>
       <div class="flip-face flip-back">
-        <div class="meaning-text">${escapeHtml(entry.meaning) || "<em>لا يوجد معنى مسجل</em>"}</div>
+        <div class="meaning-text">${escapeHtml(entry.meaning) || "<em>No meaning recorded</em>"}</div>
         <div class="pos-label">${escapeHtml(entry.part_of_speech)}</div>
       </div>
     </div>
@@ -89,7 +89,7 @@ function renderCard(entry) {
 function renderGrid(container, entries) {
   container.innerHTML = "";
   if (!entries.length) {
-    container.innerHTML = `<div class="empty-note">لا توجد كلمات بعد.</div>`;
+    container.innerHTML = `<div class="empty-note">No words yet.</div>`;
     return;
   }
   entries.forEach((entry) => container.appendChild(renderCard(entry)));
@@ -114,7 +114,7 @@ async function loadHome() {
 
 async function showRootCluster(root) {
   showView("resultsView");
-  $("#resultsTitle").textContent = `الجذر: ${root}`;
+  $("#resultsTitle").textContent = `Root: ${root}`;
   const entries = await api(`/api/root/${encodeURIComponent(root)}`);
   renderGrid($("#resultsGrid"), entries);
 }
@@ -125,7 +125,7 @@ async function runSearch(q) {
     return;
   }
   showView("resultsView");
-  $("#resultsTitle").textContent = `نتائج البحث: ${q}`;
+  $("#resultsTitle").textContent = `Search: ${q}`;
   const entries = await api(`/api/search?q=${encodeURIComponent(q)}`);
   renderGrid($("#resultsGrid"), entries);
 }
@@ -150,39 +150,39 @@ async function openCardDetail(id) {
   body.innerHTML = `
     <div class="detail-header">
       <span class="root-chip ${entry.root ? "" : "empty"}" id="detailRootChip">${escapeHtml(entry.root) || "—"}</span>
-      <button class="btn small secondary" id="detailEditToggle">تعديل</button>
+      <button class="btn small secondary" id="detailEditToggle">Edit</button>
     </div>
-    <div class="detail-primary">${escapeHtml(entry.word_ar)}</div>
-    <div class="detail-paired-list">${pairedFormsHtml(entry.word_ar_paired) || `<span class="empty-note">لا توجد صيغ أخرى</span>`}</div>
+    <div class="detail-primary" dir="rtl">${escapeHtml(entry.word_ar)}</div>
+    <div class="detail-paired-list">${pairedFormsHtml(entry.word_ar_paired) || `<span class="empty-note">No other forms</span>`}</div>
 
     <div id="detailReadOnly">
-      <div class="detail-field"><label>نوع الكلمة (part of speech)</label><div class="value">${escapeHtml(entry.part_of_speech) || "—"}</div></div>
-      <div class="detail-field"><label>ملاحظات</label><div class="value">${escapeHtml(entry.notes) || "—"}</div></div>
+      <div class="detail-field"><label>Part of speech</label><div class="value">${escapeHtml(entry.part_of_speech) || "—"}</div></div>
+      <div class="detail-field"><label>Notes</label><div class="value">${escapeHtml(entry.notes) || "—"}</div></div>
       <div class="reveal-meaning-block">
-        <button class="reveal-btn" id="detailRevealMeaning">كشف المعنى</button>
-        <div class="meaning-text hidden" id="detailMeaningText" style="margin-top:10px;">${escapeHtml(entry.meaning) || "<em>لا يوجد معنى مسجل</em>"}</div>
+        <button class="reveal-btn" id="detailRevealMeaning">Reveal meaning</button>
+        <div class="meaning-text hidden" id="detailMeaningText" style="margin-top:10px;">${escapeHtml(entry.meaning) || "<em>No meaning recorded</em>"}</div>
       </div>
     </div>
 
     <div id="detailEditForm" class="hidden">
-      <div class="detail-field"><label>الكلمة الأساسية</label><input id="editWordAr" value="${escapeHtml(entry.word_ar)}" /></div>
-      <div class="detail-field"><label>الجذر</label><input id="editRoot" value="${escapeHtml(entry.root)}" /></div>
-      <div class="detail-field"><label>نوع الكلمة</label>
+      <div class="detail-field"><label>Arabic word</label><input id="editWordAr" dir="rtl" value="${escapeHtml(entry.word_ar)}" /></div>
+      <div class="detail-field"><label>Root</label><input id="editRoot" dir="rtl" value="${escapeHtml(entry.root)}" /></div>
+      <div class="detail-field"><label>Part of speech</label>
         <select id="editPos">
           <option value="">—</option>
           ${state.config.posList.map((p) => `<option value="${escapeHtml(p)}" ${p === entry.part_of_speech ? "selected" : ""}>${escapeHtml(p)}</option>`).join("")}
         </select>
       </div>
-      <div class="detail-field"><label>المعنى</label><textarea id="editMeaning">${escapeHtml(entry.meaning)}</textarea></div>
-      <div class="detail-field"><label>ملاحظات</label><textarea id="editNotes">${escapeHtml(entry.notes)}</textarea></div>
+      <div class="detail-field"><label>Meaning</label><textarea id="editMeaning">${escapeHtml(entry.meaning)}</textarea></div>
+      <div class="detail-field"><label>Notes</label><textarea id="editNotes">${escapeHtml(entry.notes)}</textarea></div>
       <div class="detail-field">
-        <label>الصيغ الأخرى (label = صيغة)</label>
+        <label>Other forms (label + Arabic)</label>
         <div id="editPairedList"></div>
-        <button class="btn small secondary" id="addPairedFormBtn" type="button">+ إضافة صيغة</button>
+        <button class="btn small secondary" id="addPairedFormBtn" type="button">+ Add form</button>
       </div>
       <div class="add-actions">
-        <button class="btn secondary" id="deleteEntryBtn" type="button">حذف</button>
-        <button class="btn primary" id="saveEntryBtn" type="button">حفظ</button>
+        <button class="btn secondary" id="deleteEntryBtn" type="button">Delete</button>
+        <button class="btn primary" id="saveEntryBtn" type="button">Save</button>
       </div>
     </div>
   `;
@@ -211,7 +211,7 @@ async function openCardDetail(id) {
   });
 
   $("#deleteEntryBtn").addEventListener("click", async () => {
-    if (!confirm("هل تريد حذف هذه الكلمة؟")) return;
+    if (!confirm("Delete this word?")) return;
     await api(`/api/words/${id}`, { method: "DELETE" });
     closeCardModal();
     loadHome();
@@ -241,8 +241,8 @@ function renderPairedEditRows(rows) {
     const row = document.createElement("div");
     row.className = "paired-form-row";
     row.innerHTML = `
-      <input data-p-label value="${escapeHtml(r.label)}" placeholder="مثال: ماضٍ" />
-      <input data-p-word value="${escapeHtml(r.word_ar)}" placeholder="الكلمة" />
+      <input data-p-label value="${escapeHtml(r.label)}" placeholder="e.g. past" />
+      <input data-p-word dir="rtl" value="${escapeHtml(r.word_ar)}" placeholder="Arabic form" />
       <button class="icon-btn" data-remove-paired="${i}" type="button">✕</button>
     `;
     container.appendChild(row);
@@ -293,18 +293,18 @@ function renderAddStepInput() {
   const body = $("#addModalBody");
   const warn = state.config.hasApiKey
     ? ""
-    : `<div class="warn-box">لم يتم إعداد مفتاح API بعد. يمكنك إضافة الكلمة يدوياً بدون تعبئة تلقائية، أو أضف ANTHROPIC_API_KEY إلى ملف .env وأعد تشغيل الخادم.</div>`;
+    : `<div class="warn-box">No API key is set. You can add a word manually, or put ANTHROPIC_API_KEY in .env and restart the server.</div>`;
   body.innerHTML = `
     <div class="add-step">
-      <h3>إضافة كلمة جديدة</h3>
+      <h3>Add a new word</h3>
       ${warn}
       <div class="field-row">
-        <label>الكلمة (Arabic word)</label>
-        <input id="newWordInput" placeholder="اكتب الكلمة هنا" autofocus />
+        <label>Arabic word</label>
+        <input id="newWordInput" placeholder="Type the word here" dir="rtl" autofocus />
       </div>
       <div class="add-actions">
-        <button class="btn secondary" id="manualAddBtn" type="button">إضافة يدوياً بدون AI</button>
-        <button class="btn primary" id="autofillBtn" type="button" ${state.config.hasApiKey ? "" : "disabled"}>تعبئة تلقائية (AI)</button>
+        <button class="btn secondary" id="manualAddBtn" type="button">Add manually</button>
+        <button class="btn primary" id="autofillBtn" type="button" ${state.config.hasApiKey ? "" : "disabled"}>Autofill with AI</button>
       </div>
     </div>
   `;
@@ -320,14 +320,14 @@ function renderAddStepInput() {
     const word = $("#newWordInput").value.trim();
     if (!word) return;
     state.currentAddWord = word;
-    body.innerHTML = `<div class="spinner-text">جارٍ التحليل بواسطة الذكاء الاصطناعي...</div>`;
+    body.innerHTML = `<div class="spinner-text">Analyzing with AI…</div>`;
     try {
       const guess = await api("/api/autofill", { method: "POST", body: JSON.stringify({ word_ar: word }) });
       state.currentAddGuess = guess;
       renderAddStepConfirm();
     } catch (err) {
       renderAddStepInput();
-      alert(err.message || "حدث خطأ أثناء التعبئة التلقائية");
+      alert(err.message || "Autofill failed");
     }
   });
 }
@@ -337,20 +337,20 @@ function renderAddStepConfirm() {
   const body = $("#addModalBody");
   body.innerHTML = `
     <div class="add-step">
-      <h3>تأكيد الإدخال</h3>
+      <h3>Confirm entry</h3>
 
       <div class="field-row" data-field-row="word_ar">
-        <div class="field-header"><label>الكلمة (مع الحركات)</label>${retryBtn("word_ar")}</div>
-        <input data-field="word_ar" value="${escapeHtml(g.word_ar)}" />
+        <div class="field-header"><label>Arabic word (with vowels)</label>${retryBtn("word_ar")}</div>
+        <input data-field="word_ar" dir="rtl" value="${escapeHtml(g.word_ar)}" />
       </div>
 
       <div class="field-row" data-field-row="root">
-        <div class="field-header"><label>الجذر</label>${retryBtn("root")}</div>
-        <input data-field="root" value="${escapeHtml(g.root)}" />
+        <div class="field-header"><label>Root</label>${retryBtn("root")}</div>
+        <input data-field="root" dir="rtl" value="${escapeHtml(g.root)}" />
       </div>
 
       <div class="field-row" data-field-row="part_of_speech">
-        <div class="field-header"><label>نوع الكلمة</label>${retryBtn("part_of_speech")}</div>
+        <div class="field-header"><label>Part of speech</label>${retryBtn("part_of_speech")}</div>
         <select data-field="part_of_speech">
           <option value="">—</option>
           ${state.config.posList.map((p) => `<option value="${escapeHtml(p)}" ${p === g.part_of_speech ? "selected" : ""}>${escapeHtml(p)}</option>`).join("")}
@@ -358,30 +358,30 @@ function renderAddStepConfirm() {
       </div>
 
       <div class="field-row" data-field-row="meaning">
-        <div class="field-header"><label>المعنى</label>${retryBtn("meaning")}</div>
+        <div class="field-header"><label>Meaning</label>${retryBtn("meaning")}</div>
         <textarea data-field="meaning">${escapeHtml(g.meaning)}</textarea>
       </div>
 
       <div class="field-row" data-field-row="word_ar_paired">
-        <div class="field-header"><label>صيغ أخرى (مثل الماضي / الجمع)</label>${retryBtn("word_ar_paired")}</div>
+        <div class="field-header"><label>Other forms (e.g. past / plural)</label>${retryBtn("word_ar_paired")}</div>
         <div id="addPairedList"></div>
-        <button class="btn small secondary" id="addPairedFormBtnAdd" type="button">+ إضافة صيغة</button>
+        <button class="btn small secondary" id="addPairedFormBtnAdd" type="button">+ Add form</button>
       </div>
 
       <div class="field-row">
-        <label>ملاحظات</label>
+        <label>Notes</label>
         <textarea data-field="notes"></textarea>
       </div>
 
       <div class="note-box">
-        <label>ملاحظة عامة لإعادة التوليد (اختياري)</label>
-        <textarea id="wholeNoteInput" placeholder="مثال: هذه كلمة عامية وليست فصحى..."></textarea>
-        <button class="btn small secondary" id="regenerateAllBtn" type="button" style="margin-top:6px;" ${state.config.hasApiKey ? "" : "disabled"}>إعادة توليد الكل بهذه الملاحظة</button>
+        <label>Note for regenerating (optional)</label>
+        <textarea id="wholeNoteInput" placeholder="e.g. This is colloquial, not MSA…"></textarea>
+        <button class="btn small secondary" id="regenerateAllBtn" type="button" style="margin-top:6px;" ${state.config.hasApiKey ? "" : "disabled"}>Regenerate all with this note</button>
       </div>
 
       <div class="add-actions">
-        <button class="btn secondary" id="cancelAddBtn" type="button">إلغاء</button>
-        <button class="btn primary" id="commitAddBtn" type="button">حفظ الكلمة</button>
+        <button class="btn secondary" id="cancelAddBtn" type="button">Cancel</button>
+        <button class="btn primary" id="commitAddBtn" type="button">Save word</button>
       </div>
     </div>
   `;
@@ -404,7 +404,7 @@ function renderAddStepConfirm() {
     const note = $("#wholeNoteInput").value.trim();
     if (!note) return;
     syncGuessFromForm();
-    body.innerHTML = `<div class="spinner-text">جارٍ إعادة التوليد...</div>`;
+    body.innerHTML = `<div class="spinner-text">Regenerating…</div>`;
     try {
       const guess = await api("/api/autofill", {
         method: "POST",
@@ -414,7 +414,7 @@ function renderAddStepConfirm() {
       renderAddStepConfirm();
     } catch (err) {
       renderAddStepConfirm();
-      alert(err.message || "حدث خطأ");
+      alert(err.message || "Something went wrong");
     }
   });
 
@@ -427,13 +427,13 @@ function renderAddStepConfirm() {
       closeAddModal();
       loadHome();
     } catch (err) {
-      alert(err.message || "تعذر الحفظ");
+      alert(err.message || "Could not save");
     }
   });
 }
 
 function retryBtn(field) {
-  return `<button class="btn small secondary" data-retry-field="${field}" type="button" ${state.config.hasApiKey ? "" : "disabled"}>إعادة المحاولة</button>`;
+  return `<button class="btn small secondary" data-retry-field="${field}" type="button" ${state.config.hasApiKey ? "" : "disabled"}>Retry</button>`;
 }
 
 function renderAddPairedRows(rows) {
@@ -443,8 +443,8 @@ function renderAddPairedRows(rows) {
     const row = document.createElement("div");
     row.className = "paired-form-row";
     row.innerHTML = `
-      <input data-ap-label value="${escapeHtml(r.label)}" placeholder="مثال: ماضٍ" />
-      <input data-ap-word value="${escapeHtml(r.word_ar)}" placeholder="الكلمة" />
+      <input data-ap-label value="${escapeHtml(r.label)}" placeholder="e.g. past" />
+      <input data-ap-word dir="rtl" value="${escapeHtml(r.word_ar)}" placeholder="Arabic form" />
       <button class="icon-btn" data-remove-ap="${i}" type="button">✕</button>
     `;
     container.appendChild(row);
@@ -489,7 +489,7 @@ async function retryField(field) {
     renderAddStepConfirm();
   } catch (err) {
     rowEl.innerHTML = originalHtml;
-    alert(err.message || "حدث خطأ");
+    alert(err.message || "Something went wrong");
   }
 }
 
