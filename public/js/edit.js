@@ -9,7 +9,7 @@ export async function openEditModal(entryOrId) {
   const body = $("#editModalBody");
   body.innerHTML = `
     <div class="add-step">
-      <h3>Edit word</h3>
+      <h2 class="modal-title">Edit word</h2>
       <div class="detail-field"><label>Arabic word</label><input id="editWordAr" dir="rtl" value="${escapeHtml(entry.word_ar)}" /></div>
       <div class="detail-field"><label>Root</label><input id="editRoot" dir="rtl" value="${escapeHtml(entry.root)}" /></div>
       <div class="detail-field"><label>Part of speech</label>

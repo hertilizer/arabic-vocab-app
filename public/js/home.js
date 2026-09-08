@@ -1,6 +1,7 @@
 import { $, $$, escapeHtml, addedAgo } from "./lib/dom.js";
 import { api } from "./lib/api.js";
 import { stripHarakat } from "./lib/harakat.js";
+import { ICONS } from "./lib/icons.js";
 
 let openCardDetail = async () => {};
 
@@ -58,19 +59,88 @@ async function runSearch(q) {
   renderGrid($("#resultsGrid"), entries);
 }
 
+let collapseSearch = () => {};
+
 export function initHome({ openCard }) {
   openCardDetail = openCard;
+  collapseSearch = initSearch();
+
+  $$(`[data-nav="home"]`).forEach((el) => {
+    el.addEventListener("click", () => {
+      collapseSearch({ clear: true });
+      loadHome();
+    });
+  });
+}
+
+function initSearch() {
+  const wrap = $("#searchExpand");
+  const input = $("#searchInput");
+  const btn = $("#searchToggle");
+  const clearBtn = $("#searchClear");
+  btn.innerHTML = ICONS.search;
+  clearBtn.innerHTML = ICONS.close;
+
   let searchDebounce = null;
-  $("#searchInput").addEventListener("input", (e) => {
+
+  function isOpen() {
+    return wrap.classList.contains("is-open");
+  }
+
+  function syncClear() {
+    wrap.classList.toggle("has-query", !!input.value.trim());
+  }
+
+  function setOpen(open) {
+    wrap.classList.toggle("is-open", open);
+    btn.setAttribute("aria-expanded", String(open));
+    input.tabIndex = open ? 0 : -1;
+    if (open) requestAnimationFrame(() => input.focus());
+  }
+
+  function collapse({ clear = false } = {}) {
+    if (clear) {
+      input.value = "";
+      clearTimeout(searchDebounce);
+    }
+    setOpen(false);
+    syncClear();
+  }
+
+  btn.addEventListener("click", () => {
+    if (isOpen() && !input.value.trim()) {
+      setOpen(false);
+      return;
+    }
+    setOpen(true);
+  });
+
+  input.addEventListener("input", (e) => {
+    syncClear();
     clearTimeout(searchDebounce);
     const q = e.target.value;
     searchDebounce = setTimeout(() => runSearch(q), 250);
   });
 
-  $$(`[data-nav="home"]`).forEach((el) => {
-    el.addEventListener("click", () => {
-      $("#searchInput").value = "";
-      loadHome();
-    });
+  clearBtn.addEventListener("click", () => {
+    input.value = "";
+    syncClear();
+    clearTimeout(searchDebounce);
+    loadHome();
+    input.focus();
   });
+
+  input.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    collapse({ clear: true });
+    loadHome();
+  });
+
+  document.addEventListener("pointerdown", (e) => {
+    if (!isOpen() || input.value.trim()) return;
+    if (e.target.closest("#searchExpand")) return;
+    setOpen(false);
+  });
+
+  return collapse;
 }

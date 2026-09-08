@@ -12,6 +12,11 @@
 <header class="topbar">
   <h1 class="brand" data-nav="home">دفتري</h1>
   <div class="topbar-actions">
+    <div class="icon-chip lg light search-expand" id="searchExpand">
+      <button type="button" class="search-clear" id="searchClear" aria-label="مسح" title="مسح"></button>
+      <input id="searchInput" type="search" placeholder="ابحث…" autocomplete="off" dir="rtl" tabindex="-1" />
+      <button type="button" class="search-expand-btn" id="searchToggle" aria-expanded="false" aria-controls="searchInput" aria-label="بحث" title="بحث"></button>
+    </div>
     <button id="exportBtn" class="btn secondary" title="Export CSV">Export</button>
   </div>
 </header>
@@ -20,10 +25,9 @@
 
   <div class="hero">
     <h1 class="hero-title" data-nav="home">دفتري</h1>
-    <div class="hero-row">
-      <input id="searchInput" type="text" placeholder="Search…" autocomplete="off" dir="auto" />
-      <button id="addBtn" class="btn primary">+ Add</button>
-    </div>
+    <form id="addForm" class="hero-row">
+      <input id="addWordInput" type="text" placeholder="أضف كلمة…" autocomplete="off" dir="rtl" />
+    </form>
   </div>
 
   <section id="homeView" class="view">

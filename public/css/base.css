@@ -10,7 +10,11 @@
   --accent-2: #c9a35a;
   --danger: #9a3330;
   --radius: 14px;
-  --chip-size: 32px;
+  --icon-chip-sm: 32px;
+  --icon-chip-md: 40px;
+  --icon-glyph-sm: 15px;
+  --icon-glyph-md: 18px;
+  --chip-size: var(--icon-chip-sm);
   --flip-duration: 0.55s;
   --hold-fill: 1.3s;
   --title-font: 'Aref Ruqaa', serif;
@@ -91,11 +95,14 @@ body {
   gap: 10px;
 }
 
-.icon-toggle {
+/* Circular icon chip: default sm, add .lg for the next size up */
+.icon-chip {
+  --icon-chip-size: var(--icon-chip-sm);
+  --icon-chip-glyph: var(--icon-glyph-sm);
   --toggle-accent: var(--accent-2);
-  width: var(--chip-size);
-  height: var(--chip-size);
-  border-radius: 50%;
+  width: var(--icon-chip-size);
+  height: var(--icon-chip-size);
+  border-radius: 999px;
   border: 1px solid var(--border);
   background: var(--surface-2);
   color: var(--text-faint);
@@ -108,20 +115,118 @@ body {
   opacity: 0.38;
   user-select: none;
 }
-.icon-toggle svg {
-  display: block;
-  width: 15px;
-  height: 15px;
+.icon-chip.lg {
+  --icon-chip-size: var(--icon-chip-md);
+  --icon-chip-glyph: var(--icon-glyph-md);
 }
-.icon-toggle:hover {
+.icon-chip svg {
+  display: block;
+  width: var(--icon-chip-glyph);
+  height: var(--icon-chip-glyph);
+}
+.icon-chip:hover {
   color: var(--toggle-accent);
   border-color: var(--toggle-accent);
   opacity: 1;
 }
-.icon-toggle[aria-pressed="true"] {
+.icon-chip[aria-pressed="true"] {
   color: var(--toggle-accent);
   background: color-mix(in srgb, var(--toggle-accent) 38%, transparent);
   opacity: 1;
+}
+.icon-chip.light {
+  opacity: 1;
+  color: var(--text);
+}
+.icon-chip.light:hover {
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.search-expand {
+  overflow: hidden;
+  justify-content: flex-end;
+  transition: width 0.32s cubic-bezier(0.4, 0.12, 0.2, 1);
+}
+.search-expand-btn {
+  width: var(--icon-chip-size);
+  height: var(--icon-chip-size);
+  margin: -1px -1px -1px 0;
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+.search-expand-btn svg {
+  display: block;
+  width: var(--icon-chip-glyph);
+  height: var(--icon-chip-glyph);
+}
+.search-expand input {
+  flex: 0 1 auto;
+  min-width: 0;
+  width: 0;
+  opacity: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.95rem;
+  font-family: 'Noto Naskh Arabic', 'Inter', sans-serif;
+  padding: 0 2px 0 4px;
+  pointer-events: none;
+  appearance: none;
+  transition: opacity 0.18s ease 0.08s;
+}
+.search-expand input::-webkit-search-cancel-button,
+.search-expand input::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+}
+.search-expand input:focus { outline: none; }
+.search-clear {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  margin-left: 6px;
+  border: none;
+  background: none;
+  color: inherit;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  opacity: 0.7;
+}
+.search-clear svg {
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+.search-clear:hover { opacity: 1; }
+.search-expand.is-open {
+  width: min(260px, 42vw);
+}
+.search-expand.is-open input {
+  flex: 1;
+  opacity: 1;
+  pointer-events: auto;
+}
+.search-expand.is-open.has-query .search-clear {
+  display: inline-flex;
+}
+.search-expand.is-open:focus-within {
+  border-color: var(--accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .search-expand,
+  .search-expand input { transition: none; }
 }
 
 .hero {
@@ -150,7 +255,7 @@ body {
   max-width: 780px;
 }
 
-#searchInput {
+#addWordInput {
   flex: 1;
   min-width: 0;
   padding: 20px 26px;
@@ -161,14 +266,7 @@ body {
   font-size: 1.35rem;
   font-family: 'Noto Naskh Arabic', 'Inter', sans-serif;
 }
-#searchInput:focus { outline: 2px solid var(--accent); }
-
-.hero .btn.primary {
-  padding: 18px 32px;
-  font-size: 1.25rem;
-  border-radius: 14px;
-  flex-shrink: 0;
-}
+#addWordInput:focus { outline: 2px solid var(--accent); }
 
 .btn {
   border: none;

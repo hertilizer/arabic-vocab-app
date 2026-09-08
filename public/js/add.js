@@ -4,57 +4,43 @@ import { state } from "./lib/state.js";
 import { loadHome } from "./home.js";
 import { noteWordAdded } from "./export.js";
 
-function openAddModal() {
-  state.currentAddGuess = null;
-  state.currentAddWord = null;
-  renderAddStepInput();
-  $("#addModal").classList.remove("hidden");
-}
+let adding = false;
 
 function closeAddModal() {
+  adding = false;
   $("#addModal").classList.add("hidden");
 }
-function renderAddStepInput() {
-  const body = $("#addModalBody");
-  const warn = state.config.hasApiKey
-    ? ""
-    : `<div class="warn-box">No API key is set. You can add a word manually, or put ANTHROPIC_API_KEY in .env and restart the server.</div>`;
-  body.innerHTML = `
-    <div class="add-step">
-      <h3>Add a new word</h3>
-      ${warn}
-      <div class="field-row">
-        <label>Arabic word</label>
-        <input id="newWordInput" placeholder="Type the word here" dir="rtl" autofocus />
-      </div>
-      <div class="add-actions">
-        <button class="btn secondary" id="manualAddBtn" type="button">Add manually</button>
-        <button class="btn primary" id="autofillBtn" type="button" ${state.config.hasApiKey ? "" : "disabled"}>Autofill with AI</button>
-      </div>
-    </div>
-  `;
 
-  $("#manualAddBtn").addEventListener("click", () => {
-    const word = $("#newWordInput").value.trim();
-    if (!word) return;
-    state.currentAddGuess = { word_ar: word, root: "", part_of_speech: "", meaning: "", word_ar_paired: [] };
+function emptyGuess(word_ar) {
+  return { word_ar, root: "", part_of_speech: "", meaning: "", word_ar_paired: [] };
+}
+
+async function startAddAutofill(word) {
+  const word_ar = (word || "").trim();
+  if (!word_ar || adding) return;
+  adding = true;
+  state.currentAddWord = word_ar;
+  state.currentAddGuess = null;
+  $("#addModal").classList.remove("hidden");
+
+  if (!state.config.hasApiKey) {
+    state.currentAddGuess = emptyGuess(word_ar);
     renderAddStepConfirm();
-  });
+    return;
+  }
 
-  $("#autofillBtn").addEventListener("click", async () => {
-    const word = $("#newWordInput").value.trim();
-    if (!word) return;
-    state.currentAddWord = word;
-    body.innerHTML = `<div class="spinner-text">Analyzing with AI…</div>`;
-    try {
-      const guess = await api("/api/autofill", { method: "POST", body: JSON.stringify({ word_ar: word }) });
-      state.currentAddGuess = guess;
-      renderAddStepConfirm();
-    } catch (err) {
-      renderAddStepInput();
-      alert(err.message || "Autofill failed");
-    }
-  });
+  $("#addModalBody").innerHTML = `<div class="spinner-text">Analyzing with AI…</div>`;
+
+  try {
+    const guess = await api("/api/autofill", { method: "POST", body: JSON.stringify({ word_ar }) });
+    if (!adding) return;
+    state.currentAddGuess = guess;
+    renderAddStepConfirm();
+  } catch (err) {
+    if (!adding) return;
+    closeAddModal();
+    alert(err.message || "Autofill failed");
+  }
 }
 
 function renderAddStepConfirm() {
@@ -62,7 +48,7 @@ function renderAddStepConfirm() {
   const body = $("#addModalBody");
   body.innerHTML = `
     <div class="add-step">
-      <h3>Confirm entry</h3>
+      <h2 class="modal-title">Confirm entry</h2>
 
       <div class="field-row" data-field-row="word_ar">
         <div class="field-header"><label>Arabic word (with vowels)</label>${retryBtn("word_ar")}</div>
@@ -149,6 +135,7 @@ function renderAddStepConfirm() {
     try {
       await api("/api/words", { method: "POST", body: JSON.stringify(payload) });
       noteWordAdded();
+      $("#addWordInput").value = "";
       closeAddModal();
       loadHome();
     } catch (err) {
@@ -223,6 +210,8 @@ export function initAdd() {
   $("#addModal").addEventListener("click", (e) => {
     if (e.target.id === "addModal") closeAddModal();
   });
-  $("#addBtn").addEventListener("click", openAddModal);
-
+  $("#addForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    startAddAutofill($("#addWordInput").value);
+  });
 }

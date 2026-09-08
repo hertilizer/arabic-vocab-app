@@ -24,12 +24,22 @@ export const ICONS = {
       <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
         d="M2.8 12s3.2-7 9.2-7 9.2 7 9.2 7-3.2 7-9.2 7-9.2-7-9.2-7z"/>
       <circle cx="12" cy="12" r="2.6" fill="none" stroke="currentColor" stroke-width="2"/>
+    </svg>`,
+  search: `
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="10.8" cy="10.8" r="6.2" fill="none" stroke="currentColor" stroke-width="2"/>
+      <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M15.4 15.4 20.2 20.2"/>
+    </svg>`,
+  close: `
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M6.5 6.5 17.5 17.5M17.5 6.5 6.5 17.5"/>
     </svg>`
 };
 
-export function iconToggle({ icon, pressed = false, label, title, extra = "" }) {
+export function iconToggle({ icon, pressed = false, label, title, extra = "", size = "sm" }) {
   const tip = title || label;
-  return `<button class="icon-toggle" type="button" aria-pressed="${pressed}" aria-label="${escapeHtml(label)}" title="${escapeHtml(tip)}" ${extra}>${icon}</button>`;
+  const sizeClass = size === "lg" ? " lg" : "";
+  return `<button class="icon-chip${sizeClass}" type="button" aria-pressed="${pressed}" aria-label="${escapeHtml(label)}" title="${escapeHtml(tip)}" ${extra}>${icon}</button>`;
 }
 
 export function harakatBtn() {

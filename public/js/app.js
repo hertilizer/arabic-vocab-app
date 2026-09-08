@@ -28,6 +28,7 @@ function initShemaghParallax() {
 }
 
 async function init() {
+  state.config = await api("/api/config");
   initHarakat();
   initHome({ openCard: openCardDetail });
   initDetail();
@@ -35,7 +36,6 @@ async function init() {
   initAdd();
   initExport();
   initShemaghParallax();
-  state.config = await api("/api/config");
   loadHome();
 }
 

@@ -1,6 +1,6 @@
 import { $, $$, escapeHtml } from "./dom.js";
 import { state } from "./state.js";
-import { harakatBtn, ICONS } from "./icons.js";
+import { ICONS } from "./icons.js";
 
 const HARAKAT_REGEX = /[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E8\u06EA-\u06ED]/g;
 
@@ -41,7 +41,6 @@ export function initHarakat() {
     syncHarakatToggle();
     applyHarakatToDom();
   });
-  $("#exportBtn").insertAdjacentHTML("beforebegin", harakatBtn());
   $("#holdBar").insertAdjacentHTML("beforeend", ICONS.eye);
   syncHarakatToggle();
 }

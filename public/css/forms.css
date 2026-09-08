@@ -1,5 +1,13 @@
 /* --- Add flow --- */
-.add-step h3 { margin-top: 0; }
+.modal.add-modal { padding-top: 28px; }
+.modal-title {
+  font-family: var(--title-font);
+  font-size: 2.15rem;
+  font-weight: 700;
+  line-height: 1.25;
+  margin: 0 28px 18px 0;
+  color: var(--text);
+}
 .field-row {
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -56,7 +64,7 @@
   .hero { padding: 28px 0 56px; }
   .hero-title { margin-bottom: 40px; }
   .hero-row { flex-direction: column; align-items: stretch; }
-  .hero .btn.primary { width: 100%; }
+  .search-expand.is-open { width: min(160px, 38vw); }
   .grid-random { grid-template-columns: 1fr; }
   .grid-recent { grid-template-columns: repeat(2, 1fr); }
 }
