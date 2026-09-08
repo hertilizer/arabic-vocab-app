@@ -12,7 +12,6 @@
 <header class="topbar">
   <h1 class="brand" data-nav="home">دفتري</h1>
   <div class="topbar-actions">
-    <button id="harakatToggle" class="btn secondary" type="button" aria-pressed="true">Harakat on</button>
     <button id="exportBtn" class="btn secondary" title="Export CSV">Export</button>
   </div>
 </header>
@@ -45,11 +44,21 @@
 
 </main>
 
-<!-- Card detail / edit modal -->
+<!-- Card detail modal -->
 <div id="cardModal" class="modal-overlay hidden">
-  <div class="modal card-modal">
-    <button class="modal-close" data-close-card>&times;</button>
-    <div id="cardModalBody"></div>
+  <div class="flip-scene">
+    <div class="flip-card" id="cardModalBody"></div>
+  </div>
+  <div class="hold-bar" id="holdBar" aria-hidden="true">
+    <span class="hold-bar-fill"></span>
+  </div>
+</div>
+
+<!-- Edit word modal -->
+<div id="editModal" class="modal-overlay hidden">
+  <div class="modal add-modal">
+    <button class="modal-close" data-close-edit>&times;</button>
+    <div id="editModalBody"></div>
   </div>
 </div>
 

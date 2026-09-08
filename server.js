@@ -5,7 +5,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { db, buildSearchBlob, stripHarakat, rowToEntry } = require("./db");
-const { autofillEntry, autofillField, hasApiKey } = require("./autofill");
+const { autofillEntry, autofillField, exampleSentence, hasApiKey } = require("./autofill");
 const POS_LIST = require("./pos-list");
 
 const app = express();
@@ -48,6 +48,23 @@ app.post("/api/autofill/field", async (req, res) => {
     }
     console.error(err);
     res.status(500).json({ error: "Autofill failed", detail: String(err.message || err) });
+  }
+});
+
+app.post("/api/example", async (req, res) => {
+  try {
+    const { forms, meaning, part_of_speech } = req.body;
+    if (!Array.isArray(forms) || !forms.length) {
+      return res.status(400).json({ error: "forms array is required" });
+    }
+    const result = await exampleSentence({ forms, meaning, part_of_speech });
+    res.json(result);
+  } catch (err) {
+    if (err.code === "NO_API_KEY") {
+      return res.status(412).json({ error: "NO_API_KEY", message: "Add ANTHROPIC_API_KEY to your .env file to get example sentences." });
+    }
+    console.error(err);
+    res.status(500).json({ error: "Example failed", detail: String(err.message || err) });
   }
 });
 
