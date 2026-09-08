@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;600;700&family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Aref+Ruqaa:wght@400;700&family=Inter:wght@400;500;600&family=Noto+Naskh+Arabic:wght@400;600;700&display=swap');
 
 :root {
   --bg: #12161c;
@@ -11,6 +11,7 @@
   --accent-2: #d99a5b;
   --danger: #d9705b;
   --radius: 14px;
+  --title-font: 'Aref Ruqaa', serif;
 }
 
 * { box-sizing: border-box; }
@@ -28,6 +29,7 @@ body {
 .topbar {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 16px;
   padding: 16px 24px;
   border-bottom: 1px solid var(--border);
@@ -38,7 +40,7 @@ body {
 }
 
 .brand {
-  font-family: 'Noto Naskh Arabic', serif;
+  font-family: var(--title-font);
   font-size: 1.6rem;
   font-weight: 700;
   margin: 0;
@@ -47,19 +49,51 @@ body {
   flex-shrink: 0;
 }
 
-.searchwrap { flex: 1; }
+.hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px 0 88px;
+}
+
+.hero-title {
+  font-family: var(--title-font);
+  font-size: clamp(4.2rem, 12vw, 7.5rem);
+  font-weight: 700;
+  line-height: 1.15;
+  margin: 0 0 56px;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.hero-row {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 14px;
+  width: 100%;
+  max-width: 780px;
+}
 
 #searchInput {
-  width: 100%;
-  padding: 10px 16px;
+  flex: 1;
+  min-width: 0;
+  padding: 20px 26px;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: var(--surface-2);
   color: var(--text);
-  font-size: 1rem;
+  font-size: 1.35rem;
   font-family: 'Noto Naskh Arabic', 'Inter', sans-serif;
 }
 #searchInput:focus { outline: 2px solid var(--accent); }
+
+.hero .btn.primary {
+  padding: 18px 32px;
+  font-size: 1.25rem;
+  border-radius: 14px;
+  flex-shrink: 0;
+}
 
 .btn {
   border: none;
@@ -294,3 +328,10 @@ body {
 }
 
 .spinner-text { color: var(--text-dim); font-size: 0.9rem; text-align: center; padding: 20px 0; }
+
+@media (max-width: 560px) {
+  .hero { padding: 28px 0 56px; }
+  .hero-title { margin-bottom: 40px; }
+  .hero-row { flex-direction: column; align-items: stretch; }
+  .hero .btn.primary { width: 100%; }
+}

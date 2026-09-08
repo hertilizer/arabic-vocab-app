@@ -1,6 +1,8 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
+const fs = require("fs");
+const os = require("os");
 const path = require("path");
 const { db, buildSearchBlob, stripHarakat, rowToEntry } = require("./db");
 const { autofillEntry, autofillField, hasApiKey } = require("./autofill");
@@ -148,7 +150,15 @@ app.get("/api/root/:root", (req, res) => {
 });
 
 // --- CSV export ---
-app.get("/api/export/csv", (req, res) => {
+function resolveExportDir() {
+  const raw = (process.env.EXPORT_DIR || "").trim();
+  let dir = raw || path.join(__dirname, "exports");
+  if (dir === "~") dir = os.homedir();
+  else if (dir.startsWith("~/")) dir = path.join(os.homedir(), dir.slice(2));
+  return path.resolve(dir);
+}
+
+function buildCsv() {
   const rows = db.prepare("SELECT * FROM words ORDER BY id ASC").all();
   const header = ["id", "word_ar", "word_ar_paired", "root", "part_of_speech", "meaning", "notes", "date_added"];
   const escape = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
@@ -156,14 +166,26 @@ app.get("/api/export/csv", (req, res) => {
   for (const r of rows) {
     lines.push(header.map((h) => escape(r[h])).join(","));
   }
-  const csv = "\uFEFF" + lines.join("\n"); // BOM for Excel/Arabic compatibility
-  res.setHeader("Content-Type", "text/csv; charset=utf-8");
-  res.setHeader("Content-Disposition", `attachment; filename="vocab-export-${Date.now()}.csv"`);
-  res.send(csv);
+  return "\uFEFF" + lines.join("\n"); // BOM for Excel/Arabic compatibility
+}
+
+app.post("/api/export", (req, res) => {
+  try {
+    const dir = resolveExportDir();
+    fs.mkdirSync(dir, { recursive: true });
+    const filename = `vocab-export-${Date.now()}.csv`;
+    const filePath = path.join(dir, filename);
+    fs.writeFileSync(filePath, buildCsv(), "utf8");
+    res.json({ ok: true, path: filePath, filename });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Export failed", detail: String(err.message || err) });
+  }
 });
 
 app.listen(PORT, () => {
   console.log(`Arabic vocab app running at http://localhost:${PORT}`);
+  console.log(`CSV exports will be saved to ${resolveExportDir()}`);
   if (!hasApiKey()) {
     console.log("⚠️  No ANTHROPIC_API_KEY set in .env - AI autofill will be unavailable until you add one.");
   }

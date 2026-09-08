@@ -137,9 +137,11 @@ $("#searchInput").addEventListener("input", (e) => {
   searchDebounce = setTimeout(() => runSearch(q), 250);
 });
 
-$(`[data-nav="home"]`).addEventListener("click", () => {
-  $("#searchInput").value = "";
-  loadHome();
+$$(`[data-nav="home"]`).forEach((el) => {
+  el.addEventListener("click", () => {
+    $("#searchInput").value = "";
+    loadHome();
+  });
 });
 
 // ---------- Card detail modal ----------
@@ -498,22 +500,28 @@ async function retryField(field) {
 let addsSinceLastExport = 0;
 const AUTO_EXPORT_EVERY_N_ADDS = 5;
 
-function triggerExportDownload() {
-  const a = document.createElement("a");
-  a.href = "/api/export/csv";
-  a.download = "";
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  addsSinceLastExport = 0;
+async function triggerExport({ silent = false } = {}) {
+  try {
+    await api("/api/export", { method: "POST", keepalive: true });
+    addsSinceLastExport = 0;
+    if (!silent) {
+      const btn = $("#exportBtn");
+      const original = btn.textContent;
+      btn.textContent = "Saved";
+      setTimeout(() => { btn.textContent = original; }, 1500);
+    }
+  } catch (err) {
+    if (!silent) alert(err.message || "Export failed");
+    else console.error("Auto-export failed", err);
+  }
 }
 
-$("#exportBtn").addEventListener("click", () => triggerExportDownload());
+$("#exportBtn").addEventListener("click", () => triggerExport());
 
 function noteWordAdded() {
   addsSinceLastExport += 1;
   if (addsSinceLastExport >= AUTO_EXPORT_EVERY_N_ADDS) {
-    triggerExportDownload();
+    triggerExport({ silent: true });
   }
 }
 
@@ -521,7 +529,7 @@ function noteWordAdded() {
 // unexported work, fire a backup export automatically.
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden" && addsSinceLastExport > 0) {
-    triggerExportDownload();
+    triggerExport({ silent: true });
   }
 });
 

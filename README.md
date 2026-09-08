@@ -32,12 +32,13 @@ known" state).
 - All data lives in `vocab.db`, a SQLite file in this folder — not in git (see
   `.gitignore`), not on any server. Back it up like any file (copy it, put it in
   a synced folder, whatever you already do for local files).
-- **Manual export**: the "⭳ تصدير" button in the top bar downloads a full CSV of
-  every entry at any time.
-- **Auto-export safety net**: the app automatically triggers a CSV download every
-  5 words added, and again whenever you switch away from/close the tab if there's
-  unexported work. This is a browser-triggered download (lands in your normal
-  Downloads folder), not a silent background upload anywhere.
+- **Manual export**: the Export button in the top bar writes a full CSV of every
+  entry to the export folder.
+- **Auto-export safety net**: the app automatically writes a CSV every 5 words
+  added, and again whenever you switch away from/close the tab if there's
+  unexported work. Files go to `exports/` in this folder by default — set
+  `EXPORT_DIR` in `.env` to any other path (absolute or `~/...`). Restart the
+  server after changing it.
 
 ## Editing the app
 
