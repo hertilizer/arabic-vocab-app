@@ -281,7 +281,9 @@ body {
 .btn.small { padding: 6px 12px; font-size: 0.85rem; border-radius: 8px; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.view.hidden { display: none; }
+.view.hidden,
+.hero.hidden,
+.section-title.hidden { display: none; }
 
 .section-block { margin-bottom: 32px; }
 .section-title {
@@ -333,5 +335,46 @@ body {
   bottom: 12px;
 }
 
+.grid-results {
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+.grid-results .word-card {
+  min-height: 220px;
+  padding: 48px 24px 44px;
+}
+.grid-results .card-word {
+  font-size: 2.6rem;
+}
+
 .empty-note { color: var(--text-dim); font-size: 0.9rem; padding: 8px 0; }
+
+.empty-state {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 24px 120px;
+  text-align: center;
+}
+.empty-state-mark {
+  font-family: var(--title-font);
+  font-size: clamp(2.8rem, 8vw, 4.8rem);
+  font-weight: 700;
+  color: var(--accent);
+  line-height: 1.2;
+  margin: 0 0 16px;
+}
+.empty-state-query {
+  font-family: 'Noto Naskh Arabic', serif;
+  font-size: 1.45rem;
+  color: var(--text);
+  margin: 0 0 12px;
+}
+.empty-state-hint {
+  margin: 0;
+  color: var(--text-faint);
+  font-size: 0.9rem;
+}
 

@@ -67,4 +67,5 @@
   .search-expand.is-open { width: min(160px, 38vw); }
   .grid-random { grid-template-columns: 1fr; }
   .grid-recent { grid-template-columns: repeat(2, 1fr); }
+  .grid-results { grid-template-columns: repeat(2, 1fr); }
 }

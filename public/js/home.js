@@ -8,6 +8,7 @@ let openCardDetail = async () => {};
 export function showView(id) {
   $$(".view").forEach((v) => v.classList.add("hidden"));
   $(`#${id}`).classList.remove("hidden");
+  $(".hero").classList.toggle("hidden", id !== "homeView");
 }
 
 function renderCard(entry) {
@@ -22,10 +23,10 @@ function renderCard(entry) {
   return el;
 }
 
-function renderGrid(container, entries) {
+function renderGrid(container, entries, emptyHtml) {
   container.innerHTML = "";
   if (!entries.length) {
-    container.innerHTML = `<div class="empty-note">No words yet.</div>`;
+    container.innerHTML = emptyHtml || `<div class="empty-note">No words yet.</div>`;
     return;
   }
   entries.forEach((entry) => container.appendChild(renderCard(entry)));
@@ -43,7 +44,9 @@ export async function loadHome() {
 
 export async function showRootCluster(root) {
   showView("resultsView");
-  $("#resultsTitle").textContent = `Root: ${root}`;
+  const title = $("#resultsTitle");
+  title.textContent = `Root: ${root}`;
+  title.classList.remove("hidden");
   const entries = await api(`/api/root/${encodeURIComponent(root)}`);
   renderGrid($("#resultsGrid"), entries);
 }
@@ -54,9 +57,15 @@ async function runSearch(q) {
     return;
   }
   showView("resultsView");
-  $("#resultsTitle").textContent = `Search: ${q}`;
+  $("#resultsTitle").classList.add("hidden");
   const entries = await api(`/api/search?q=${encodeURIComponent(q)}`);
-  renderGrid($("#resultsGrid"), entries);
+  renderGrid($("#resultsGrid"), entries, `
+    <div class="empty-state">
+      <p class="empty-state-mark" dir="rtl">لا نتائج</p>
+      <p class="empty-state-query" dir="rtl">${escapeHtml(q)}</p>
+      <p class="empty-state-hint">Nothing in the notebook matches this search.</p>
+    </div>
+  `);
 }
 
 let collapseSearch = () => {};
