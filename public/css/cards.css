@@ -69,4 +69,8 @@
   color: var(--text-faint);
 }
 .icon-btn.quiet:hover { color: var(--text-dim); }
+.icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 

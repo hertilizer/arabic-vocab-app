@@ -7,6 +7,8 @@
   padding: 20px;
 }
 .modal-overlay.hidden { display: none; }
+#editModal,
+#addModal { z-index: 110; }
 .modal {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -254,11 +256,11 @@
   font-size: 0.95rem;
   color: var(--text-faint);
 }
-[data-reroll-example].is-spinning {
+.icon-btn.is-spinning {
   pointer-events: none;
   opacity: 0.7;
 }
-[data-reroll-example].is-spinning svg {
+.icon-btn.is-spinning svg {
   animation: reroll-spin 0.7s linear infinite;
 }
 @keyframes reroll-spin {
@@ -271,6 +273,17 @@
   margin-top: 28px;
 }
 .detail-added { font-size: 0.75rem; color: var(--text-faint); }
+.detail-added.is-saved {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent-2);
+}
+.detail-added.is-saved svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
 .detail-field { margin-top: 14px; }
 .detail-field label { display: block; font-size: 0.75rem; color: var(--text-dim); margin-bottom: 4px; }
 .detail-field textarea, .detail-field input, .detail-field select {

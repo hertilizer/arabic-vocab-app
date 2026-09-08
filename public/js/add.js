@@ -1,6 +1,8 @@
 import { $, $$, escapeHtml, dateInputValue } from "./lib/dom.js";
 import { api } from "./lib/api.js";
 import { state } from "./lib/state.js";
+import { ICONS, quietIconBtn } from "./lib/icons.js";
+import { regenExpandHtml, currentRegenNote, isRegenOpen, bindRegenExpand, collapseRegenOnPointerDown } from "./lib/regen.js";
 import { loadHome } from "./home.js";
 import { openCardDetail } from "./detail.js";
 import { noteWordAdded } from "./export.js";
@@ -9,6 +11,7 @@ let adding = false;
 
 function closeAddModal() {
   adding = false;
+  $("#addModal .modal")?.classList.remove("is-entry");
   $("#addModal").classList.add("hidden");
 }
 
@@ -46,6 +49,7 @@ async function startAddAutofill(word) {
   }
 
   $("#addModal").classList.remove("hidden");
+  $("#addModal .modal")?.classList.add("is-entry");
 
   if (!state.config.hasApiKey) {
     state.currentAddGuess = emptyGuess(word_ar);
@@ -53,7 +57,7 @@ async function startAddAutofill(word) {
     return;
   }
 
-  $("#addModalBody").innerHTML = `<div class="spinner-text">Analyzing with AI…</div>`;
+    $("#addModalBody").innerHTML = `<div class="spinner-text is-spinning">${ICONS.reroll}</div>`;
 
   try {
     const guess = await api("/api/autofill", { method: "POST", body: JSON.stringify({ word_ar }) });
@@ -75,61 +79,65 @@ async function startAddAutofill(word) {
   }
 }
 
-function renderAddStepConfirm() {
+function posOptions(selected) {
+  return state.config.posList.map((p) => `<option value="${escapeHtml(p)}" ${p === selected ? "selected" : ""}>${escapeHtml(p)}</option>`).join("");
+}
+
+function renderAddStepConfirm({ keepRegen = true } = {}) {
   const g = state.currentAddGuess;
   const body = $("#addModalBody");
+  const regenNote = keepRegen ? currentRegenNote(body) : "";
+  const regenOpen = keepRegen && isRegenOpen(body);
+  $("#addModal .modal")?.classList.add("is-entry");
   body.innerHTML = `
-    <div class="add-step">
-      <h2 class="modal-title">Confirm entry</h2>
-
-      <div class="field-row" data-field-row="word_ar">
-        <div class="field-header"><label>Arabic word (with vowels)</label>${retryBtn("word_ar")}</div>
-        <input data-field="word_ar" dir="rtl" value="${escapeHtml(g.word_ar)}" />
+    <div class="entry-form">
+      <p class="entry-kicker">Confirm entry</p>
+      <div class="entry-grid">
+        <div class="entry-col">
+          <div class="entry-field entry-word" data-field-row="word_ar">
+            <div class="entry-label"><label>Word</label>${retryBtn("word_ar")}</div>
+            <input data-field="word_ar" dir="rtl" value="${escapeHtml(g.word_ar)}" />
+          </div>
+          <div class="entry-split">
+            <div class="entry-field" data-field-row="root">
+              <div class="entry-label"><label>Root</label>${retryBtn("root")}</div>
+              <input data-field="root" dir="rtl" value="${escapeHtml(g.root)}" />
+            </div>
+            <div class="entry-field" data-field-row="part_of_speech">
+              <div class="entry-label"><label>Part of speech</label>${retryBtn("part_of_speech")}</div>
+              <select data-field="part_of_speech" class="entry-pos" dir="rtl">
+                <option value="">—</option>
+                ${posOptions(g.part_of_speech)}
+              </select>
+            </div>
+          </div>
+          <div class="entry-field" data-field-row="word_ar_paired">
+            <div class="entry-label"><label>Other forms</label>${retryBtn("word_ar_paired")}</div>
+            <div id="addPairedList" class="paired-form-list"></div>
+            <button class="entry-add-form" id="addPairedFormBtnAdd" type="button">+ Add form</button>
+          </div>
+        </div>
+        <div class="entry-col">
+          <div class="entry-field entry-meaning" data-field-row="meaning">
+            <div class="entry-label"><label>Meaning</label>${retryBtn("meaning")}</div>
+            <textarea data-field="meaning">${escapeHtml(g.meaning)}</textarea>
+          </div>
+          <div class="entry-field entry-notes">
+            <div class="entry-label"><label>Notes</label></div>
+            <textarea data-field="notes">${escapeHtml(g.notes || "")}</textarea>
+          </div>
+          <div class="entry-field entry-date">
+            <div class="entry-label"><label>Date learned</label></div>
+            <input data-field="date_learned" type="date" value="${escapeHtml(dateInputValue(g.date_learned))}" />
+          </div>
+        </div>
       </div>
-
-      <div class="field-row" data-field-row="root">
-        <div class="field-header"><label>Root</label>${retryBtn("root")}</div>
-        <input data-field="root" dir="rtl" value="${escapeHtml(g.root)}" />
-      </div>
-
-      <div class="field-row" data-field-row="part_of_speech">
-        <div class="field-header"><label>Part of speech</label>${retryBtn("part_of_speech")}</div>
-        <select data-field="part_of_speech">
-          <option value="">—</option>
-          ${state.config.posList.map((p) => `<option value="${escapeHtml(p)}" ${p === g.part_of_speech ? "selected" : ""}>${escapeHtml(p)}</option>`).join("")}
-        </select>
-      </div>
-
-      <div class="field-row" data-field-row="meaning">
-        <div class="field-header"><label>Meaning</label>${retryBtn("meaning")}</div>
-        <textarea data-field="meaning">${escapeHtml(g.meaning)}</textarea>
-      </div>
-
-      <div class="field-row" data-field-row="word_ar_paired">
-        <div class="field-header"><label>Other forms (e.g. past / plural)</label>${retryBtn("word_ar_paired")}</div>
-        <div id="addPairedList"></div>
-        <button class="btn small secondary" id="addPairedFormBtnAdd" type="button">+ Add form</button>
-      </div>
-
-      <div class="field-row">
-        <label>Notes</label>
-        <textarea data-field="notes"></textarea>
-      </div>
-
-      <div class="field-row">
-        <label>Date learned (optional)</label>
-        <input data-field="date_learned" type="date" value="${escapeHtml(dateInputValue(g.date_learned))}" />
-      </div>
-
-      <div class="note-box">
-        <label>Note for regenerating (optional)</label>
-        <textarea id="wholeNoteInput" placeholder="e.g. This is colloquial, not MSA…"></textarea>
-        <button class="btn small secondary" id="regenerateAllBtn" type="button" style="margin-top:6px;" ${state.config.hasApiKey ? "" : "disabled"}>Regenerate all with this note</button>
-      </div>
-
-      <div class="add-actions">
-        <button class="btn secondary" id="cancelAddBtn" type="button">Cancel</button>
-        <button class="btn primary" id="commitAddBtn" type="button">Save word</button>
+      <div class="entry-actions">
+        <div class="entry-actions-start">
+          <button class="btn secondary" id="cancelAddBtn" type="button">Cancel</button>
+          ${regenExpandHtml({ open: regenOpen, note: regenNote })}
+        </div>
+        <button class="btn primary" id="commitAddBtn" type="button">Add</button>
       </div>
     </div>
   `;
@@ -147,23 +155,16 @@ function renderAddStepConfirm() {
   });
 
   $("#cancelAddBtn").addEventListener("click", closeAddModal);
-
-  $("#regenerateAllBtn").addEventListener("click", async () => {
-    const note = $("#wholeNoteInput").value.trim();
-    if (!note) return;
-    syncGuessFromForm();
-    body.innerHTML = `<div class="spinner-text">Regenerating…</div>`;
-    try {
-      const guess = await api("/api/autofill", {
-        method: "POST",
-        body: JSON.stringify({ word_ar: state.currentAddGuess.word_ar, note, existing: state.currentAddGuess })
-      });
+  bindRegenExpand(body, {
+    getExisting() {
+      syncGuessFromForm();
+      return state.currentAddGuess;
+    },
+    applyGuess(guess) {
       state.currentAddGuess = { ...guess, notes: state.currentAddGuess.notes, date_learned: state.currentAddGuess.date_learned };
-      renderAddStepConfirm();
-    } catch (err) {
-      renderAddStepConfirm();
-      alert(err.message || "Something went wrong");
-    }
+      renderAddStepConfirm({ keepRegen: false });
+    },
+    stillActive: () => adding
   });
 
   $("#commitAddBtn").addEventListener("click", async () => {
@@ -186,7 +187,11 @@ function renderAddStepConfirm() {
 }
 
 function retryBtn(field) {
-  return `<button class="btn small secondary" data-retry-field="${field}" type="button" ${state.config.hasApiKey ? "" : "disabled"}>Retry</button>`;
+  return quietIconBtn({
+    icon: ICONS.reroll,
+    label: "Retry",
+    extra: `data-retry-field="${field}" ${state.config.hasApiKey ? "" : "disabled"}`
+  });
 }
 
 function renderAddPairedRows(rows) {
@@ -196,8 +201,8 @@ function renderAddPairedRows(rows) {
     const row = document.createElement("div");
     row.className = "paired-form-row";
     row.innerHTML = `
-      <input data-ap-label value="${escapeHtml(r.label)}" placeholder="e.g. past" />
-      <input data-ap-word dir="rtl" value="${escapeHtml(r.word_ar)}" placeholder="Arabic form" />
+      <input data-ap-word dir="rtl" value="${escapeHtml(r.word_ar)}" placeholder="الصيغة" />
+      <input data-ap-label dir="rtl" value="${escapeHtml(r.label)}" placeholder="ماضٍ" />
       <button class="icon-btn" data-remove-ap="${i}" type="button">✕</button>
     `;
     container.appendChild(row);
@@ -229,19 +234,22 @@ function syncGuessFromForm() {
 }
 
 async function retryField(field) {
+  const btn = $(`[data-retry-field="${field}"]`);
+  if (!btn || btn.disabled || btn.classList.contains("is-spinning")) return;
   syncGuessFromForm();
-  const rowEl = $(`[data-field-row="${field}"]`);
-  const originalHtml = rowEl.innerHTML;
-  rowEl.innerHTML = `<div class="spinner-text">...</div>`;
+  btn.classList.add("is-spinning");
+  btn.disabled = true;
   try {
     const result = await api("/api/autofill/field", {
       method: "POST",
       body: JSON.stringify({ field, word_ar: state.currentAddGuess.word_ar, existing: state.currentAddGuess })
     });
+    if (!adding) return;
     state.currentAddGuess = { ...state.currentAddGuess, ...result };
     renderAddStepConfirm();
   } catch (err) {
-    rowEl.innerHTML = originalHtml;
+    btn.classList.remove("is-spinning");
+    btn.disabled = false;
     alert(err.message || "Something went wrong");
   }
 }
@@ -251,6 +259,7 @@ export function initAdd() {
   $("#addModal").addEventListener("click", (e) => {
     if (e.target.id === "addModal") closeAddModal();
   });
+  $("#addModal").addEventListener("pointerdown", collapseRegenOnPointerDown);
   $("#addForm").addEventListener("submit", (e) => {
     e.preventDefault();
     startAddAutofill($("#addWordInput").value);

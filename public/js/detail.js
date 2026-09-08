@@ -187,7 +187,7 @@ async function fetchAndShowExample() {
   }
 }
 
-export async function openCardDetail(id) {
+export async function openCardDetail(id, { saved = false } = {}) {
   const entry = await api(`/api/words/${id}`);
   const body = $("#cardModalBody");
   const notesBlock = entry.notes
@@ -232,16 +232,28 @@ export async function openCardDetail(id) {
   });
 
   $("#detailEditBtn").addEventListener("click", () => {
-    closeCardModal();
     openEditModal(entry);
   });
 
   setCardFace("front");
   syncHarakatToggle();
   $("#cardModal").classList.remove("hidden");
+  if (saved) flashSaved(addedAgo(entryDisplayDate(entry)));
 }
 
-function closeCardModal() {
+function flashSaved(restoreText) {
+  const el = $(".detail-added");
+  if (!el) return;
+  el.classList.add("is-saved");
+  el.innerHTML = `${ICONS.check}<span>Saved</span>`;
+  setTimeout(() => {
+    if (!el.isConnected) return;
+    el.classList.remove("is-saved");
+    el.textContent = restoreText || "";
+  }, 1600);
+}
+
+export function closeCardModal() {
   clearHold();
   holdFired = false;
   setExampleBusy(false);
