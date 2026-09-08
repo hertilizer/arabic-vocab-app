@@ -43,11 +43,15 @@ known" state).
 ## Editing the app
 
 It's plain files — no build step:
-- `server.js` — API routes
-- `db.js` — SQLite schema and helpers (harakat stripping, search blob)
-- `autofill.js` — the Claude prompt and calls for AI autofill
-- `pos-list.js` — the maintained list of Arabic grammatical terms
-- `public/index.html`, `public/style.css`, `public/app.js` — the frontend
+- `server.js` — Express entry (static files + listen)
+- `server/db.js` — SQLite schema and helpers (harakat stripping, search blob)
+- `server/pos-list.js` — the maintained list of Arabic grammatical terms
+- `server/ai/` — Claude client, autofill, and example-sentence prompts
+- `server/routes/` — API routes (config, words, AI, export)
+- `public/index.html` — page shell
+- `public/css/` — styles
+- `public/js/` — frontend modules (`app.js` boots the rest)
+- `public/img/` — shemagh background tiles
 
 Restart the server (`Ctrl+C` then `npm start`, or use `npm run dev` for auto-reload
 on save) to see backend changes. Frontend changes just need a page refresh.
@@ -61,7 +65,7 @@ Each word is one row:
 | `word_ar` | primary Arabic form, voweled (present tense for verbs, singular for nouns) |
 | `word_ar_paired` | array of `{label, word_ar}` for other forms (ماضٍ, جمع, etc.) — never duplicates the primary |
 | `root` | triliteral/quadriliteral root; blank for idioms/loanwords |
-| `part_of_speech` | from the maintained list in `pos-list.js` |
+| `part_of_speech` | from the maintained list in `server/pos-list.js` |
 | `meaning` | hidden by default in the UI, revealed on tap |
 | `notes` | catch-all free text |
 | `date_added` | set automatically |

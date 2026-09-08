@@ -1,0 +1,95 @@
+const { db, buildSearchBlob, stripHarakat, rowToEntry } = require("../db");
+
+function mountWordRoutes(app) {
+  app.post("/api/words", (req, res) => {
+    const { word_ar, word_ar_paired = [], root = "", part_of_speech = "", meaning = "", notes = "" } = req.body;
+    if (!word_ar) return res.status(400).json({ error: "word_ar is required" });
+    const search_blob = buildSearchBlob(word_ar, word_ar_paired);
+    const stmt = db.prepare(`
+      INSERT INTO words (word_ar, word_ar_paired, root, part_of_speech, meaning, notes, search_blob)
+      VALUES (@word_ar, @word_ar_paired, @root, @part_of_speech, @meaning, @notes, @search_blob)
+    `);
+    const info = stmt.run({
+      word_ar,
+      word_ar_paired: JSON.stringify(word_ar_paired),
+      root,
+      part_of_speech,
+      meaning,
+      notes,
+      search_blob
+    });
+    const row = db.prepare("SELECT * FROM words WHERE id = ?").get(info.lastInsertRowid);
+    res.status(201).json(rowToEntry(row));
+  });
+
+  app.put("/api/words/:id", (req, res) => {
+    const { id } = req.params;
+    const existing = db.prepare("SELECT * FROM words WHERE id = ?").get(id);
+    if (!existing) return res.status(404).json({ error: "Not found" });
+
+    const merged = {
+      word_ar: req.body.word_ar ?? existing.word_ar,
+      word_ar_paired: req.body.word_ar_paired ?? JSON.parse(existing.word_ar_paired),
+      root: req.body.root ?? existing.root,
+      part_of_speech: req.body.part_of_speech ?? existing.part_of_speech,
+      meaning: req.body.meaning ?? existing.meaning,
+      notes: req.body.notes ?? existing.notes
+    };
+    const search_blob = buildSearchBlob(merged.word_ar, merged.word_ar_paired);
+
+    db.prepare(`
+      UPDATE words SET word_ar=@word_ar, word_ar_paired=@word_ar_paired, root=@root,
+        part_of_speech=@part_of_speech, meaning=@meaning, notes=@notes, search_blob=@search_blob
+      WHERE id=@id
+    `).run({
+      ...merged,
+      word_ar_paired: JSON.stringify(merged.word_ar_paired),
+      search_blob,
+      id
+    });
+
+    const row = db.prepare("SELECT * FROM words WHERE id = ?").get(id);
+    res.json(rowToEntry(row));
+  });
+
+  app.delete("/api/words/:id", (req, res) => {
+    db.prepare("DELETE FROM words WHERE id = ?").run(req.params.id);
+    res.status(204).end();
+  });
+
+  app.get("/api/words/:id", (req, res) => {
+    const row = db.prepare("SELECT * FROM words WHERE id = ?").get(req.params.id);
+    if (!row) return res.status(404).json({ error: "Not found" });
+    res.json(rowToEntry(row));
+  });
+
+  app.get("/api/words", (req, res) => {
+    const limit = Math.min(parseInt(req.query.limit) || 24, 200);
+    const rows = db.prepare("SELECT * FROM words ORDER BY id DESC LIMIT ?").all(limit);
+    res.json(rows.map(rowToEntry));
+  });
+
+  app.get("/api/random", (req, res) => {
+    const count = Math.min(parseInt(req.query.count) || 3, 20);
+    const rows = db.prepare("SELECT * FROM words ORDER BY RANDOM() LIMIT ?").all(count);
+    res.json(rows.map(rowToEntry));
+  });
+
+  app.get("/api/search", (req, res) => {
+    const q = stripHarakat((req.query.q || "").trim());
+    if (!q) return res.json([]);
+    const rows = db.prepare(`
+      SELECT * FROM words
+      WHERE search_blob LIKE @pat OR meaning LIKE @pat OR notes LIKE @pat OR root LIKE @rootPat
+      ORDER BY id DESC LIMIT 100
+    `).all({ pat: `%${q}%`, rootPat: `%${req.query.q}%` });
+    res.json(rows.map(rowToEntry));
+  });
+
+  app.get("/api/root/:root", (req, res) => {
+    const rows = db.prepare("SELECT * FROM words WHERE root = ? ORDER BY id ASC").all(req.params.root);
+    res.json(rows.map(rowToEntry));
+  });
+}
+
+module.exports = { mountWordRoutes };

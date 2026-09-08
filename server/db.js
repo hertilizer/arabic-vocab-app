@@ -1,7 +1,8 @@
 const path = require("path");
 const Database = require("better-sqlite3");
 
-const db = new Database(path.join(__dirname, "vocab.db"));
+const ROOT = path.join(__dirname, "..");
+const db = new Database(path.join(ROOT, "vocab.db"));
 db.pragma("journal_mode = WAL");
 
 db.exec(`

@@ -1,0 +1,72 @@
+/* --- Word card --- */
+.word-card {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 36px 20px 34px;
+  min-height: 140px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.word-card:hover { border-color: var(--accent); }
+
+.card-word {
+  font-family: 'Noto Naskh Arabic', serif;
+  font-size: 2rem;
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.3;
+}
+.card-added {
+  position: absolute;
+  left: 16px;
+  bottom: 14px;
+  margin: 0;
+  font-size: 0.62rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--text-faint);
+  pointer-events: none;
+}
+
+.root-chip {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--accent);
+  border-radius: 999px;
+  padding: 0 10px;
+  height: var(--chip-size);
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  font-family: 'Noto Naskh Arabic', serif;
+  line-height: 1;
+}
+.root-chip:hover { border-color: var(--accent); }
+.root-chip.empty { color: var(--text-dim); font-style: italic; }
+
+.icon-btn {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.icon-btn svg {
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+.icon-btn:hover { color: var(--text); }
+.icon-btn.quiet {
+  color: var(--text-faint);
+}
+.icon-btn.quiet:hover { color: var(--text-dim); }
+
