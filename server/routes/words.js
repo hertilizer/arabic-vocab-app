@@ -1,9 +1,19 @@
-const { db, buildSearchBlob, stripHarakat, rowToEntry } = require("../db");
+const { db, buildSearchBlob, stripHarakat, rowToEntry, findDuplicate } = require("../db");
 
 function mountWordRoutes(app) {
+  app.get("/api/duplicate", (req, res) => {
+    const word_ar = (req.query.word_ar || "").trim();
+    if (!word_ar) return res.status(400).json({ error: "word_ar is required" });
+    res.json({ existing: findDuplicate(word_ar) });
+  });
+
   app.post("/api/words", (req, res) => {
     const { word_ar, word_ar_paired = [], root = "", part_of_speech = "", meaning = "", notes = "" } = req.body;
     if (!word_ar) return res.status(400).json({ error: "word_ar is required" });
+    const existing = findDuplicate(word_ar);
+    if (existing) {
+      return res.status(409).json({ error: "DUPLICATE", existing });
+    }
     const search_blob = buildSearchBlob(word_ar, word_ar_paired);
     const stmt = db.prepare(`
       INSERT INTO words (word_ar, word_ar_paired, root, part_of_speech, meaning, notes, search_blob)

@@ -2,6 +2,7 @@ import { $, $$, escapeHtml } from "./lib/dom.js";
 import { api } from "./lib/api.js";
 import { state } from "./lib/state.js";
 import { loadHome } from "./home.js";
+import { openCardDetail } from "./detail.js";
 import { noteWordAdded } from "./export.js";
 
 let adding = false;
@@ -15,12 +16,32 @@ function emptyGuess(word_ar) {
   return { word_ar, root: "", part_of_speech: "", meaning: "", word_ar_paired: [] };
 }
 
+async function openExistingWord(entry) {
+  adding = false;
+  $("#addModal").classList.add("hidden");
+  $("#addWordInput").value = "";
+  openCardDetail(entry.id);
+}
+
 async function startAddAutofill(word) {
   const word_ar = (word || "").trim();
   if (!word_ar || adding) return;
   adding = true;
   state.currentAddWord = word_ar;
   state.currentAddGuess = null;
+
+  try {
+    const { existing } = await api(`/api/duplicate?word_ar=${encodeURIComponent(word_ar)}`);
+    if (existing) {
+      openExistingWord(existing);
+      return;
+    }
+  } catch (err) {
+    adding = false;
+    alert(err.message || "Could not check for duplicates");
+    return;
+  }
+
   $("#addModal").classList.remove("hidden");
 
   if (!state.config.hasApiKey) {
@@ -139,6 +160,10 @@ function renderAddStepConfirm() {
       closeAddModal();
       loadHome();
     } catch (err) {
+      if (err.status === 409 && err.body?.existing) {
+        openExistingWord(err.body.existing);
+        return;
+      }
       alert(err.message || "Could not save");
     }
   });

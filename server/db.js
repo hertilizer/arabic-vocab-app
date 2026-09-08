@@ -51,4 +51,17 @@ function rowToEntry(row) {
   };
 }
 
-module.exports = { db, stripHarakat, buildSearchBlob, rowToEntry };
+function findDuplicate(word_ar, { excludeId } = {}) {
+  const key = stripHarakat(word_ar).trim();
+  if (!key) return null;
+  const rows = db.prepare("SELECT * FROM words WHERE search_blob LIKE ?").all(`%${key}%`);
+  for (const row of rows) {
+    if (excludeId && Number(row.id) === Number(excludeId)) continue;
+    const paired = JSON.parse(row.word_ar_paired || "[]");
+    const forms = [row.word_ar, ...paired.map((f) => f.word_ar)];
+    if (forms.some((f) => stripHarakat(f) === key)) return rowToEntry(row);
+  }
+  return null;
+}
+
+module.exports = { db, stripHarakat, buildSearchBlob, rowToEntry, findDuplicate };
