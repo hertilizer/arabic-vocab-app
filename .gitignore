@@ -6,3 +6,4 @@ vocab.db-journal
 vocab.db-wal
 vocab.db-shm
 *.log
+.DS_Store
