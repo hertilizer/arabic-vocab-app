@@ -21,28 +21,33 @@ export function arHtml(str) {
 }
 
 export function syncHarakatToggle() {
-  $$("[data-harakat-toggle]").forEach((btn) => {
+  $$("[data-harakat-toggle]", $("#cardModal") || document).forEach((btn) => {
     btn.setAttribute("aria-pressed", String(state.showHarakat));
     btn.setAttribute("aria-label", state.showHarakat ? "Harakat on" : "Harakat off");
   });
 }
 
 export function applyHarakatToDom() {
-  $$(".ar-text").forEach((el) => {
+  const card = $("#cardModal");
+  if (!card) return;
+  $$(".ar-text", card).forEach((el) => {
     const raw = el.dataset.voweled ?? "";
     el.textContent = displayAr(raw);
   });
 }
 
+export function resetHarakat() {
+  state.showHarakat = false;
+  syncHarakatToggle();
+}
+
 export function initHarakat() {
   document.addEventListener("click", (e) => {
-    const btn = e.target.closest("[data-harakat-toggle]");
+    const btn = e.target.closest("#cardModal [data-harakat-toggle]");
     if (!btn) return;
     state.showHarakat = !state.showHarakat;
-    localStorage.setItem("showHarakat", String(state.showHarakat));
     syncHarakatToggle();
     applyHarakatToDom();
   });
   $("#holdBar").insertAdjacentHTML("beforeend", ICONS.eye);
-  syncHarakatToggle();
 }

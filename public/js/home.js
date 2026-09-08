@@ -1,6 +1,6 @@
 import { $, $$, escapeHtml, addedAgo } from "./lib/dom.js";
 import { api } from "./lib/api.js";
-import { arHtml } from "./lib/harakat.js";
+import { stripHarakat } from "./lib/harakat.js";
 import { ICONS } from "./lib/icons.js";
 
 let openCardDetail = async () => {};
@@ -16,7 +16,7 @@ function renderCard(entry) {
   el.className = "word-card";
   el.dataset.id = entry.id;
   el.innerHTML = `
-    <div class="card-word" dir="rtl">${arHtml(entry.word_ar)}</div>
+    <div class="card-word" dir="rtl">${escapeHtml(stripHarakat(entry.word_ar))}</div>
     <div class="card-added">${escapeHtml(addedAgo(entry.date_added))}</div>
   `;
   el.addEventListener("click", () => openCardDetail(entry.id));

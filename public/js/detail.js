@@ -2,7 +2,7 @@ import { $, escapeHtml, addedAgo } from "./lib/dom.js";
 import { api } from "./lib/api.js";
 import { state } from "./lib/state.js";
 import { ICONS, harakatBtn, quietIconBtn } from "./lib/icons.js";
-import { arHtml, syncHarakatToggle } from "./lib/harakat.js";
+import { arHtml, syncHarakatToggle, resetHarakat } from "./lib/harakat.js";
 import { showRootCluster } from "./home.js";
 import { openEditModal } from "./edit.js";
 
@@ -195,6 +195,7 @@ export async function openCardDetail(id) {
     : "";
   const meaning = escapeHtml(entry.meaning) || "No meaning recorded.";
   detailEntry = entry;
+  resetHarakat();
   body.innerHTML = `
     <div class="flip-face flip-front">
       <div class="detail-kicker-row">
@@ -245,6 +246,7 @@ function closeCardModal() {
   holdFired = false;
   setExampleBusy(false);
   detailEntry = null;
+  resetHarakat();
   setCardFace("front");
   $("#cardModal").classList.add("hidden");
 }
@@ -301,5 +303,13 @@ export function initDetail() {
   $("#cardModal").addEventListener("click", (e) => {
     if (e.target.id === "cardModal") closeCardModal();
     if (e.target.closest("[data-reroll-example]")) fetchAndShowExample();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    if ($("#cardModal").classList.contains("hidden")) return;
+    if (!$("#addModal").classList.contains("hidden")) return;
+    if (!$("#editModal").classList.contains("hidden")) return;
+    e.preventDefault();
+    closeCardModal();
   });
 }
