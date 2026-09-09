@@ -4,6 +4,7 @@ import { state } from "./lib/state.js";
 import { loadHome } from "./home.js";
 import { openCardDetail, closeCardModal } from "./detail.js";
 import { regenExpandHtml, currentRegenNote, isRegenOpen, setRegenOpen, bindRegenExpand, collapseRegenOnPointerDown } from "./lib/regen.js";
+import { ICONS, quietIconBtn } from "./lib/icons.js";
 
 let editingId = null;
 
@@ -29,16 +30,16 @@ function renderEditForm(entry, { keepRegen = true } = {}) {
       <div class="entry-grid">
         <div class="entry-col">
           <div class="entry-field entry-word">
-            <div class="entry-label"><label>Word</label></div>
+            <div class="entry-label"><label>Word</label>${retryBtn("word_ar")}</div>
             <input id="editWordAr" dir="rtl" value="${escapeHtml(entry.word_ar)}" />
           </div>
           <div class="entry-split">
             <div class="entry-field">
-              <div class="entry-label"><label>Root</label></div>
+              <div class="entry-label"><label>Root</label>${retryBtn("root")}</div>
               <input id="editRoot" dir="rtl" value="${escapeHtml(entry.root)}" />
             </div>
             <div class="entry-field">
-              <div class="entry-label"><label>Part of speech</label></div>
+              <div class="entry-label"><label>Part of speech</label>${retryBtn("part_of_speech")}</div>
               <select id="editPos" class="entry-pos" dir="rtl">
                 <option value="">—</option>
                 ${posOptions(entry.part_of_speech)}
@@ -46,14 +47,14 @@ function renderEditForm(entry, { keepRegen = true } = {}) {
             </div>
           </div>
           <div class="entry-field">
-            <div class="entry-label"><label>Other forms</label></div>
+            <div class="entry-label"><label>Other forms</label>${retryBtn("word_ar_paired")}</div>
             <div id="editPairedList" class="paired-form-list"></div>
             <button class="entry-add-form" id="addPairedFormBtn" type="button">+ Add form</button>
           </div>
         </div>
         <div class="entry-col">
           <div class="entry-field entry-meaning">
-            <div class="entry-label"><label>Meaning</label></div>
+            <div class="entry-label"><label>Meaning</label>${retryBtn("meaning")}</div>
             <textarea id="editMeaning">${escapeHtml(entry.meaning)}</textarea>
           </div>
           <div class="entry-field entry-notes">
@@ -88,6 +89,10 @@ function renderEditForm(entry, { keepRegen = true } = {}) {
   });
 
   $("#cancelEditBtn").addEventListener("click", dismissEdit);
+
+  $$("[data-retry-field]").forEach((btn) => {
+    btn.addEventListener("click", () => retryEditField(btn.dataset.retryField));
+  });
 
   bindRegenExpand(body, {
     getExisting: getEditPayload,
@@ -124,6 +129,40 @@ function renderEditForm(entry, { keepRegen = true } = {}) {
       alert(err.message || "Could not save");
     }
   });
+}
+
+function retryBtn(field) {
+  return quietIconBtn({
+    icon: ICONS.reroll,
+    label: "Retry",
+    extra: `data-retry-field="${field}" ${state.config.hasApiKey ? "" : "disabled"}`
+  });
+}
+
+async function retryEditField(field) {
+  const btn = $(`[data-retry-field="${field}"]`);
+  if (!btn || btn.disabled || btn.classList.contains("is-spinning")) return;
+  const existing = getEditPayload();
+  btn.classList.add("is-spinning");
+  btn.disabled = true;
+  try {
+    const result = await api("/api/autofill/field", {
+      method: "POST",
+      body: JSON.stringify({ field, word_ar: existing.word_ar, existing })
+    });
+    if (editingId == null) return;
+    renderEditForm({
+      id: editingId,
+      ...existing,
+      ...result,
+      notes: existing.notes,
+      date_learned: existing.date_learned
+    });
+  } catch (err) {
+    btn.classList.remove("is-spinning");
+    btn.disabled = false;
+    alert(err.message || "Something went wrong");
+  }
 }
 
 function getEditPayload() {

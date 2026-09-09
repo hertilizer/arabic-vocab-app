@@ -272,6 +272,32 @@ body {
 }
 #addWordInput:focus { outline: 2px solid var(--accent); }
 
+.hero-batch-btn {
+  flex: 0 0 auto;
+  align-self: stretch;
+  width: 108px;
+  min-width: 108px;
+  border-radius: 999px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #faf6ef;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+.hero-batch-btn svg {
+  display: block;
+  width: 28px;
+  height: 28px;
+}
+.hero-batch-btn:hover {
+  background: #e2554c;
+  border-color: #e2554c;
+}
+.hero-batch-btn:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
+
 .btn {
   border: none;
   border-radius: 10px;

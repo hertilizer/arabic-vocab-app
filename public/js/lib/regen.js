@@ -7,7 +7,7 @@ export function regenExpandHtml({ open = false, note = "" } = {}) {
   if (!state.config.hasApiKey) return "";
   return `
     <div class="icon-chip lg light search-expand regen-expand${open ? " is-open" : ""}">
-      <button type="button" class="search-expand-btn" data-regen-toggle aria-expanded="${open}" aria-label="Regenerate" title="Regenerate"></button>
+      <button type="button" class="search-expand-btn" data-regen-toggle aria-expanded="${open}" aria-label="Regenerate" title="Regenerate">${ICONS.reroll}</button>
       <input class="regen-note" type="text" value="${escapeHtml(note)}" placeholder="e.g. colloquial, not MSA…" autocomplete="off" tabindex="${open ? "0" : "-1"}" />
     </div>
   `;
@@ -32,7 +32,7 @@ export function setRegenOpen(open, root = document) {
   if (open) requestAnimationFrame(() => input.focus());
 }
 
-export function bindRegenExpand(root, { getExisting, applyGuess, stillActive }) {
+export function bindRegenExpand(root, { getExisting, applyGuess, stillActive, startRegen }) {
   const wrap = $(".regen-expand", root);
   const btn = $("[data-regen-toggle]", root);
   const input = $(".regen-note", root);
@@ -66,6 +66,10 @@ export function bindRegenExpand(root, { getExisting, applyGuess, stillActive }) 
     const note = input.value.trim();
     if (!note || btn.classList.contains("is-spinning")) return;
     const existing = getExisting();
+    if (startRegen) {
+      startRegen({ note, existing });
+      return;
+    }
     btn.classList.add("is-spinning");
     btn.disabled = true;
     try {
