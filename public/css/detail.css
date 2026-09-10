@@ -165,6 +165,9 @@
   margin: 4px 0 8px;
   gap: 12px;
 }
+.detail-kicker-row [data-harakat-toggle] {
+  margin-inline-start: auto;
+}
 .detail-primary {
   font-family: 'Noto Naskh Arabic', serif;
   font-size: 3rem;

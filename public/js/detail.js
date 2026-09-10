@@ -194,12 +194,13 @@ export async function openCardDetail(id, { saved = false } = {}) {
     ? `<div class="detail-block"><div class="detail-kicker">Notes</div><p class="detail-notes">${escapeHtml(entry.notes)}</p></div>`
     : "";
   const meaning = escapeHtml(entry.meaning) || "No meaning recorded.";
+  const root = (entry.root || "").trim();
   detailEntry = entry;
   resetHarakat();
   body.innerHTML = `
     <div class="flip-face flip-front">
       <div class="detail-kicker-row">
-        <span class="root-chip ${entry.root ? "" : "empty"}" id="detailRootChip">${escapeHtml(entry.root) || "no root"}</span>
+        ${root ? `<span class="root-chip" id="detailRootChip">${escapeHtml(entry.root)}</span>` : ""}
         ${harakatBtn()}
       </div>
       <div class="detail-primary${entry.part_of_speech ? " has-pos-tip" : ""}" dir="rtl"${entry.part_of_speech ? ` data-tooltip="${escapeHtml(entry.part_of_speech)}" tabindex="0"` : ""}>${arHtml(entry.word_ar)}</div>
@@ -224,11 +225,9 @@ export async function openCardDetail(id, { saved = false } = {}) {
     </div>
   `;
 
-  $("#detailRootChip").addEventListener("click", () => {
-    if (entry.root) {
-      closeCardModal();
-      showRootCluster(entry.root);
-    }
+  $("#detailRootChip")?.addEventListener("click", () => {
+    closeCardModal();
+    showRootCluster(entry.root);
   });
 
   $("#detailEditBtn").addEventListener("click", () => {
