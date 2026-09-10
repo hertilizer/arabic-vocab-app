@@ -26,9 +26,10 @@ Rules:
   - Use tense/number-SPECIFIC entries (e.g. "فعل أمر") only for standalone forms that won't be paired (e.g. an imperative given alone, not alongside its present tense).
   - If nothing fits confidently, return "".
 - "meaning": concise English gloss(es), using the base/dictionary form's meaning (not the specific conjugated meaning of what was typed, e.g. don't say "I wrote" for كتبت - say "to write"). If multiple distinct senses exist (polysemy), list them separated by "; ". Leave "" if unsure.
+- Forms in "word_ar" and "word_ar_paired" should be Levantine/Jordanian amiya as spoken, not MSA/fusha, unless the word itself is MSA-only.
 - "word_ar_paired": an array of {"label": <Arabic grammatical label such as "ماضٍ", "مضارع", "أمر", "جمع", "مثنى">, "word_ar": <voweled form>}.
   - For a VERB, this always includes the third-person masculine singular past tense (ماضٍ), since word_ar itself is now always the present tense (مضارع) base form.
-  - For a NOUN, include the plural (جمع) here, using the correct broken or sound plural. Include dual (مثنى) only if natural/common.
+  - For a NOUN, include the plural (جمع) actually used in Levantine/Jordanian amiya, not the fusha dictionary plural. Prefer the spoken broken plural when speakers use one. For sound plurals use amiya ـين (never fusha ـون) and ـات only when it is what people say. Do not list a fusha-only plural instead of or beside the amiya one. Include dual (مثنى) only if natural/common in speech.
   - For idioms, loanwords, and particles: return an empty array.
   - Do NOT duplicate the primary word_ar inside this array.
 - If the input is an idiom/multi-word phrase or a loanword, set "root" to "" and "part_of_speech" to "تعبير اصطلاحي" (idiom) or the closest fitting noun-like entry (loanword), and "word_ar_paired" to [].
