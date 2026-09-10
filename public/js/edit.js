@@ -3,7 +3,7 @@ import { api } from "./lib/api.js";
 import { state } from "./lib/state.js";
 import { loadHome } from "./home.js";
 import { openCardDetail, closeCardModal } from "./detail.js";
-import { regenExpandHtml, currentRegenNote, isRegenOpen, setRegenOpen, bindRegenExpand, collapseRegenOnPointerDown } from "./lib/regen.js";
+import { regenExpandHtml, currentRegenNote, isRegenOpen, setRegenOpen, bindRegenExpand, collapseRegenOnPointerDown, stripRegenMeta, mountRegenAside } from "./lib/regen.js";
 import { ICONS, quietIconBtn } from "./lib/icons.js";
 
 let editingId = null;
@@ -23,8 +23,10 @@ function renderEditForm(entry, { keepRegen = true } = {}) {
   const body = $("#editModalBody");
   const regenNote = keepRegen ? currentRegenNote(body) : "";
   const regenOpen = keepRegen && isRegenOpen(body);
-  $("#editModal .modal")?.classList.add("is-entry");
+  $("#editModal").classList.add("is-deck");
+  $("#editModal .modal")?.classList.add("is-entry", "is-deck");
   body.innerHTML = `
+    <div class="deck-layout">
     <div class="entry-form">
       <p class="entry-kicker">Edit word</p>
       <div class="entry-grid">
@@ -78,7 +80,9 @@ function renderEditForm(entry, { keepRegen = true } = {}) {
         </div>
       </div>
     </div>
+    </div>
   `;
+  mountRegenAside($(".deck-layout", body), entry);
 
   renderPairedEditRows(entry.word_ar_paired || []);
 
@@ -95,14 +99,13 @@ function renderEditForm(entry, { keepRegen = true } = {}) {
   });
 
   bindRegenExpand(body, {
-    getExisting: getEditPayload,
+    getExisting: () => stripRegenMeta(getEditPayload()),
     applyGuess(guess) {
-      renderEditForm({
-        id: editingId,
+      writeEditFields({
         ...guess,
         notes: $("#editNotes").value,
         date_learned: $("#editDateLearned").value
-      }, { keepRegen: false });
+      });
     },
     stillActive: () => editingId != null
   });
@@ -148,16 +151,12 @@ async function retryEditField(field) {
   try {
     const result = await api("/api/autofill/field", {
       method: "POST",
-      body: JSON.stringify({ field, word_ar: existing.word_ar, existing })
+      body: JSON.stringify({ field, word_ar: existing.word_ar, existing: stripRegenMeta(existing) })
     });
     if (editingId == null) return;
-    renderEditForm({
-      id: editingId,
-      ...existing,
-      ...result,
-      notes: existing.notes,
-      date_learned: existing.date_learned
-    });
+    writeEditFields({ ...existing, ...result }, { keepAside: true });
+    btn.classList.remove("is-spinning");
+    btn.disabled = false;
   } catch (err) {
     btn.classList.remove("is-spinning");
     btn.disabled = false;
@@ -177,9 +176,19 @@ function getEditPayload() {
   };
 }
 
+function writeEditFields(guess, { keepAside = false } = {}) {
+  $("#editWordAr").value = guess.word_ar || "";
+  $("#editRoot").value = guess.root || "";
+  $("#editPos").value = guess.part_of_speech || "";
+  $("#editMeaning").value = guess.meaning || "";
+  renderPairedEditRows(guess.word_ar_paired || []);
+  if (!keepAside) mountRegenAside($(".deck-layout", $("#editModalBody")), guess);
+}
+
 function closeEditModal() {
   editingId = null;
-  $("#editModal .modal")?.classList.remove("is-entry");
+  $("#editModal .modal")?.classList.remove("is-entry", "is-deck", "has-reroll-aside");
+  $("#editModal").classList.remove("is-deck");
   $("#editModal").classList.add("hidden");
 }
 

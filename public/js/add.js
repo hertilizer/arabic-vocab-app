@@ -3,7 +3,7 @@ import { api } from "./lib/api.js";
 import { state } from "./lib/state.js";
 import { ICONS, quietIconBtn } from "./lib/icons.js";
 import { stripHarakat } from "./lib/harakat.js";
-import { regenExpandHtml, currentRegenNote, isRegenOpen, bindRegenExpand, collapseRegenOnPointerDown } from "./lib/regen.js";
+import { regenExpandHtml, currentRegenNote, isRegenOpen, bindRegenExpand, collapseRegenOnPointerDown, stripRegenMeta, attachRegenMeta, mountRegenAside } from "./lib/regen.js";
 import { loadHome } from "./home.js";
 import { openCardDetail } from "./detail.js";
 import { noteWordAdded } from "./export.js";
@@ -25,6 +25,7 @@ function setAddModalKind(kind) {
     modal.classList.toggle("is-batch-start", kind === "batch-start");
     modal.classList.toggle("is-dup", kind === "dup");
     modal.classList.toggle("is-deck", kind === "deck");
+    if (kind !== "deck") modal.classList.remove("has-reroll-aside");
   }
   overlay?.classList.toggle("is-deck", kind === "deck");
 }
@@ -357,7 +358,9 @@ function syncDeckLayout() {
   if (!scene || !top) return;
   top.style.height = "auto";
   const h = Math.max(top.scrollHeight, 460);
+  const layout = $(".deck-layout");
   scene.style.setProperty("--deck-h", `${h}px`);
+  layout?.style.setProperty("--deck-h", `${h}px`);
   top.style.height = "";
 }
 
@@ -426,11 +429,16 @@ function refreshDeckCard(item) {
   if (idx < 0 || idx > 2) return;
   const card = deckCardEl(item);
   if (!card) return;
-  if (idx === 0 && item.guess && card.dataset.ready === "1" && card.dataset.bound === "1") return;
+  if (idx === 0 && item.guess && card.dataset.ready === "1" && card.dataset.bound === "1") {
+    writeGuessFields(item.guess, card);
+    mountRegenAside($(".deck-layout"), item.guess);
+    return;
+  }
   fillCard(card, item, idx);
   if (idx === 0) {
     state.currentAddWord = item.typed;
     state.currentAddGuess = item.guess;
+    mountRegenAside($(".deck-layout"), item.guess);
   }
   requestAnimationFrame(syncDeckLayout);
 }
@@ -439,11 +447,12 @@ function renderDeck() {
   if (!batch) return;
   setAddModalKind("deck");
   const layers = batch.items.slice(0, 3);
-  $("#addModalBody").innerHTML = `<div class="deck-scene">${layers.map((item, i) => deckCardHtml(item, i)).join("")}</div>`;
+  $("#addModalBody").innerHTML = `<div class="deck-layout"><div class="deck-scene">${layers.map((item, i) => deckCardHtml(item, i)).join("")}</div></div>`;
   layers.forEach((item, i) => {
     const card = deckCardEl(item);
     if (card) fillCard(card, item, i);
   });
+  mountRegenAside($(".deck-layout"), batch.items[0]?.guess);
   requestAnimationFrame(syncDeckLayout);
 }
 
@@ -487,6 +496,7 @@ function restackDom() {
     state.currentAddWord = topItem.typed;
     state.currentAddGuess = topItem.guess;
   }
+  mountRegenAside($(".deck-layout"), topItem?.guess);
   requestAnimationFrame(syncDeckLayout);
 }
 
@@ -570,10 +580,10 @@ async function rerollCurrentToBack({ note, existing }) {
   const item = currentBatchItem();
   if (!item || !note || batchAnimating) return;
   const existingGuess = { ...(existing || item.guess) };
-  item.seq += 1;
-  const seq = item.seq;
-  item.loading = true;
-  item.guess = null;
+    item.seq += 1;
+    const seq = item.seq;
+    item.loading = true;
+    if (batch.items.length > 1) item.guess = null;
   item.promise = (async () => {
     try {
       const guess = await api("/api/autofill", {
@@ -581,15 +591,15 @@ async function rerollCurrentToBack({ note, existing }) {
         body: JSON.stringify({
           word_ar: existingGuess.word_ar || item.typed,
           note,
-          existing: existingGuess
+          existing: stripRegenMeta(existingGuess)
         })
       });
       if (item.seq !== seq || !batch) return;
-      item.guess = {
+      item.guess = attachRegenMeta({
         ...guess,
         notes: existingGuess.notes || "",
         date_learned: existingGuess.date_learned || batch.dateLearned || ""
-      };
+      }, note);
     } catch (err) {
       if (item.seq !== seq) return;
       item.guess = existingGuess;
@@ -609,10 +619,6 @@ async function rerollCurrentToBack({ note, existing }) {
     top?.classList.remove("is-flying-reroll-solo");
     batchAnimating = false;
     if (!batch) return;
-    if (top) {
-      delete top.dataset.ready;
-      delete top.dataset.bound;
-    }
     refreshDeckCard(item);
     return;
   }
@@ -696,12 +702,13 @@ function bindEntryForm(root) {
   bindRegenExpand(root, {
     getExisting() {
       syncGuessFromForm();
-      return state.currentAddGuess;
+      return stripRegenMeta(state.currentAddGuess);
     },
     applyGuess(guess) {
       state.currentAddGuess = { ...guess, notes: state.currentAddGuess?.notes, date_learned: state.currentAddGuess?.date_learned };
       if (isBatch() && currentBatchItem()) currentBatchItem().guess = state.currentAddGuess;
-      renderAddStepConfirm({ keepRegen: false });
+      writeGuessFields(state.currentAddGuess);
+      mountRegenAside($(".deck-layout"), state.currentAddGuess);
     },
     stillActive: () => adding,
     startRegen: isBatch() ? rerollCurrentToBack : undefined
@@ -732,8 +739,9 @@ function renderAddStepConfirm({ keepRegen = true } = {}) {
   const body = $("#addModalBody");
   const regenNote = keepRegen ? currentRegenNote(body) : "";
   const regenOpen = keepRegen && isRegenOpen(body);
-  setAddModalKind("entry");
-  body.innerHTML = entryFormHtml(g, { isBatch: false });
+  setAddModalKind("deck");
+  body.innerHTML = `<div class="deck-layout">${entryFormHtml(g, { isBatch: false })}</div>`;
+  mountRegenAside($(".deck-layout", body), g);
   const input = $(".regen-note", body);
   if (input) {
     input.value = regenNote;
@@ -823,7 +831,7 @@ async function commitCurrentWord() {
   if (batchAnimating) return;
   if (isBatch()) batchAnimating = true;
   syncGuessFromForm();
-  const payload = { ...state.currentAddGuess, word_ar_paired: getAddPairedRows().filter((r) => r.word_ar.trim()) };
+  const payload = stripRegenMeta({ ...state.currentAddGuess, word_ar_paired: getAddPairedRows().filter((r) => r.word_ar.trim()) });
   try {
     const saved = await api("/api/words", { method: "POST", body: JSON.stringify(payload) });
     noteWordAdded();
@@ -864,6 +872,17 @@ function retryBtn(field) {
     label: "Retry",
     extra: `data-retry-field="${field}" ${state.config.hasApiKey ? "" : "disabled"}`
   });
+}
+
+function writeGuessFields(g, root = formRoot()) {
+  if (!g || !root) return;
+  $$("[data-field]", root).forEach((el) => {
+    const key = el.dataset.field;
+    if (!key || key === "notes" || key === "date_learned") return;
+    if (g[key] == null) return;
+    el.value = g[key];
+  });
+  renderAddPairedRows(g.word_ar_paired || [], root);
 }
 
 function renderAddPairedRows(rows, root = formRoot()) {
@@ -920,12 +939,14 @@ async function retryField(field) {
   try {
     const result = await api("/api/autofill/field", {
       method: "POST",
-      body: JSON.stringify({ field, word_ar: state.currentAddGuess.word_ar, existing: state.currentAddGuess })
+      body: JSON.stringify({ field, word_ar: state.currentAddGuess.word_ar, existing: stripRegenMeta(state.currentAddGuess) })
     });
     if (!adding) return;
     state.currentAddGuess = { ...state.currentAddGuess, ...result };
     if (isBatch() && currentBatchItem()) currentBatchItem().guess = state.currentAddGuess;
-    renderAddStepConfirm();
+    writeGuessFields(state.currentAddGuess);
+    btn.classList.remove("is-spinning");
+    btn.disabled = false;
   } catch (err) {
     btn.classList.remove("is-spinning");
     btn.disabled = false;

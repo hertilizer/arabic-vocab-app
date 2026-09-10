@@ -3,6 +3,68 @@ import { api } from "./api.js";
 import { ICONS } from "./icons.js";
 import { state } from "./state.js";
 
+export function stripRegenMeta(guess) {
+  if (!guess) return guess;
+  const { reroll_note, reroll_why, ...rest } = guess;
+  return rest;
+}
+
+export function attachRegenMeta(guess, note) {
+  const next = { ...stripRegenMeta(guess) };
+  const n = String(note || "").trim();
+  const why = String(guess?.reroll_why || "").trim();
+  if (n) next.reroll_note = n;
+  if (why) next.reroll_why = why;
+  return next;
+}
+
+export function regenAsideHtml(guess) {
+  const note = String(guess?.reroll_note || "").trim();
+  const why = String(guess?.reroll_why || "").trim();
+  if (!note && !why) return "";
+  return `
+    <aside class="reroll-aside">
+      ${note ? `<div class="reroll-aside-block"><p class="reroll-aside-kicker">You asked</p><p class="reroll-aside-prompt">${escapeHtml(note)}</p></div>` : ""}
+      ${why ? `<div class="reroll-aside-block"><p class="reroll-aside-kicker">Why</p><p class="reroll-aside-why">${escapeHtml(why)}</p></div>` : ""}
+    </aside>`;
+}
+
+function setAsideOpen(host, on) {
+  host.classList.toggle("has-reroll-aside", on);
+  host.closest(".modal")?.classList.toggle("has-reroll-aside", on);
+}
+
+export function mountRegenAside(host, guess) {
+  if (!host) return;
+  const note = String(guess?.reroll_note || "").trim();
+  const why = String(guess?.reroll_why || "").trim();
+  const cur = host.querySelector(":scope > .reroll-aside");
+  if (cur && cur.dataset.note === note && cur.dataset.why === why) {
+    setAsideOpen(host, true);
+    return;
+  }
+  const alreadyOpen = host.classList.contains("has-reroll-aside");
+  cur?.remove();
+  const html = regenAsideHtml(guess);
+  if (!html) {
+    setAsideOpen(host, false);
+    return;
+  }
+  host.insertAdjacentHTML("beforeend", html);
+  const aside = host.querySelector(":scope > .reroll-aside");
+  if (aside) {
+    aside.dataset.note = note;
+    aside.dataset.why = why;
+  }
+  if (alreadyOpen) {
+    setAsideOpen(host, true);
+    return;
+  }
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => setAsideOpen(host, true));
+  });
+}
+
 export function regenExpandHtml({ open = false, note = "" } = {}) {
   if (!state.config.hasApiKey) return "";
   return `
@@ -75,10 +137,14 @@ export function bindRegenExpand(root, { getExisting, applyGuess, stillActive, st
     try {
       const guess = await api("/api/autofill", {
         method: "POST",
-        body: JSON.stringify({ word_ar: existing.word_ar, note, existing })
+        body: JSON.stringify({ word_ar: existing.word_ar, note, existing: stripRegenMeta(existing) })
       });
       if (stillActive && !stillActive()) return;
-      applyGuess(guess);
+      applyGuess(attachRegenMeta(guess, note));
+      btn.classList.remove("is-spinning");
+      btn.disabled = false;
+      setRegenOpen(false, root);
+      if (input) input.value = "";
     } catch (err) {
       btn.classList.remove("is-spinning");
       btn.disabled = false;

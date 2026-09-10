@@ -35,29 +35,44 @@ Rules:
 - If the input is an idiom/multi-word phrase or a loanword, set "root" to "" and "part_of_speech" to "تعبير اصطلاحي" (idiom) or the closest fitting noun-like entry (loanword), and "word_ar_paired" to [].
 
 Respond with ONLY a raw JSON object, no markdown fences, no preamble, matching this exact shape:
-{"word_ar": "...", "root": "...", "part_of_speech": "...", "meaning": "...", "word_ar_paired": [{"label": "...", "word_ar": "..."}]}`;
+{"word_ar": "...", "root": "...", "part_of_speech": "...", "meaning": "...", "word_ar_paired": [{"label": "...", "word_ar": "..."}], "reroll_why": ""}
+- "reroll_why": always a string. Leave "" unless the user provided a note/correction. When they did, write 1–3 short English sentences: which fields you changed and why, OR why you kept the original (the note was already satisfied, conflicts with amiya or the dictionary base-form rules, or you are not confident). Never invent a change just to satisfy the note.`;
+
+function sanitizeExisting(existing) {
+  if (!existing || typeof existing !== "object") return existing;
+  const { reroll_note, reroll_why, ...rest } = existing;
+  return rest;
+}
 
 function buildUserPrompt({ word_ar, note, existing }) {
   let prompt = `Word: ${word_ar}`;
-  if (existing) {
-    prompt += `\n\nExisting guess to refine (only if a note below asks you to fix something):\n${JSON.stringify(existing)}`;
+  const prior = sanitizeExisting(existing);
+  if (prior) {
+    prompt += `\n\nExisting guess to refine (only if a note below asks you to fix something):\n${JSON.stringify(prior)}`;
   }
   if (note) {
-    prompt += `\n\nUser note/correction: ${note}\nApply this note as guidance and regenerate all fields accordingly.`;
+    prompt += `\n\nUser note/correction: ${note}\nApply this note as guidance and regenerate all fields accordingly.\nYou MUST fill "reroll_why" (not "") explaining what changed versus the existing guess, or why you did not change it.`;
   }
   return prompt;
+}
+
+function normalizeGuess(result, note) {
+  if (!result || typeof result !== "object") return result;
+  if (note) result.reroll_why = String(result.reroll_why || "").trim();
+  else delete result.reroll_why;
+  return result;
 }
 
 async function autofillEntry({ word_ar, note, existing }) {
   const anthropic = requireClient();
   const resp = await anthropic.messages.create({
     model: "claude-sonnet-4-5",
-    max_tokens: 500,
+    max_tokens: note ? 800 : 500,
     system: SYSTEM_PROMPT,
     messages: [{ role: "user", content: buildUserPrompt({ word_ar, note, existing }) }]
   });
   const text = resp.content.map((b) => (b.type === "text" ? b.text : "")).join("");
-  return parseJsonResponse(text);
+  return normalizeGuess(parseJsonResponse(text), note);
 }
 
 async function autofillField({ field, word_ar, note, existing }) {
@@ -75,7 +90,7 @@ async function autofillField({ field, word_ar, note, existing }) {
     ]
   });
   const text = resp.content.map((b) => (b.type === "text" ? b.text : "")).join("");
-  return parseJsonResponse(text);
+  return normalizeGuess(parseJsonResponse(text), note);
 }
 
 module.exports = { autofillEntry, autofillField };
