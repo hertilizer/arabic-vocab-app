@@ -32,14 +32,25 @@ function renderGrid(container, entries, emptyHtml) {
   entries.forEach((entry) => container.appendChild(renderCard(entry)));
 }
 
+function renderStats({ words = 0, roots = 0 } = {}) {
+  const set = (key, n) => {
+    const el = $(`[data-stat="${key}"]`);
+    if (el) el.textContent = Number(n).toLocaleString("en-US");
+  };
+  set("words", words);
+  set("roots", roots);
+}
+
 export async function loadHome() {
   showView("homeView");
-  const [randomWords, recentWords] = await Promise.all([
+  const [randomWords, recentWords, stats] = await Promise.all([
     api("/api/random?count=3"),
-    api("/api/words?limit=24")
+    api("/api/words?limit=100"),
+    api("/api/stats").catch(() => ({ words: 0, roots: 0 }))
   ]);
   renderGrid($("#randomGrid"), randomWords);
   renderGrid($("#recentGrid"), recentWords);
+  renderStats(stats);
 }
 
 export async function showRootCluster(root) {

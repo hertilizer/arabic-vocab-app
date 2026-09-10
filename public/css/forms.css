@@ -559,4 +559,5 @@
   .grid-recent { grid-template-columns: repeat(2, 1fr); }
   .grid-results { grid-template-columns: repeat(2, 1fr); }
   .deck-card { padding: 22px 16px 18px; }
+  .stats-banner { gap: 48px; padding-top: 28px; }
 }

@@ -86,6 +86,14 @@ function mountWordRoutes(app) {
     res.status(204).end();
   });
 
+  app.get("/api/stats", (req, res) => {
+    const words = db.prepare("SELECT COUNT(*) AS n FROM words").get().n;
+    const roots = db.prepare(`
+      SELECT COUNT(DISTINCT root) AS n FROM words WHERE TRIM(root) != ''
+    `).get().n;
+    res.json({ words, roots });
+  });
+
   app.get("/api/words/:id", (req, res) => {
     const row = db.prepare("SELECT * FROM words WHERE id = ?").get(req.params.id);
     if (!row) return res.status(404).json({ error: "Not found" });
@@ -93,7 +101,7 @@ function mountWordRoutes(app) {
   });
 
   app.get("/api/words", (req, res) => {
-    const limit = Math.min(parseInt(req.query.limit) || 24, 200);
+    const limit = Math.min(parseInt(req.query.limit) || 100, 200);
     const rows = db.prepare("SELECT * FROM words ORDER BY id DESC LIMIT ?").all(limit);
     res.json(rows.map(rowToEntry));
   });

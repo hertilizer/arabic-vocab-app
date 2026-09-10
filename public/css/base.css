@@ -386,6 +386,36 @@ body {
 
 .empty-note { color: var(--text-dim); font-size: 0.9rem; padding: 8px 0; }
 
+.stats-banner {
+  display: flex;
+  justify-content: center;
+  gap: 88px;
+  margin: 28px 0 8px;
+  padding: 36px 16px 20px;
+  border-top: 1px solid var(--border);
+}
+.stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 6.5rem;
+}
+.stat-value {
+  font-family: var(--title-font);
+  font-size: clamp(2.6rem, 7vw, 3.6rem);
+  font-weight: 700;
+  line-height: 1;
+  color: var(--accent-2);
+}
+.stat-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
 .empty-state {
   grid-column: 1 / -1;
   display: flex;
