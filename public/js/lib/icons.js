@@ -48,6 +48,11 @@ export const ICONS = {
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
         d="M20 19.5v-15A2.5 2.5 0 0 0 17.5 2H4v20h13.5a2.5 2.5 0 0 0 0-5H4"/>
+    </svg>`,
+  calendar: `
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="4" y="5.5" width="16" height="14.5" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
+      <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M8 3.8v4M16 3.8v4M4 10h16"/>
     </svg>`
 };
 

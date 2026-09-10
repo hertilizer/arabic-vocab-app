@@ -57,6 +57,29 @@ function emptyGuess(word_ar, date_learned = "") {
   return { word_ar, root: "", part_of_speech: "", meaning: "", word_ar_paired: [], notes: "", date_learned };
 }
 
+function shouldApplyBatchDate(current, batchDate) {
+  const next = String(batchDate || "").trim();
+  if (!next) return false;
+  const prev = String(current || "").trim();
+  return !prev || next < prev;
+}
+
+async function applyBatchLearnedDate(entry) {
+  const date_learned = batch?.dateLearned || "";
+  if (!entry || !shouldApplyBatchDate(entry.date_learned, date_learned)) {
+    return entry ? { ...entry, date_updated: false } : entry;
+  }
+  try {
+    const result = await api(`/api/words/${entry.id}/date-learned`, {
+      method: "PATCH",
+      body: JSON.stringify({ date_learned })
+    });
+    return { ...(result.entry || entry), date_updated: !!result.updated };
+  } catch {
+    return { ...entry, date_updated: false };
+  }
+}
+
 function todayYmd() {
   const d = new Date();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -221,7 +244,9 @@ function fillItem(item) {
       });
       if (item.seq !== seq || !batch) return;
       if (existing) {
-        item.existing = existing;
+        const dated = await applyBatchLearnedDate(existing);
+        if (item.seq !== seq || !batch) return;
+        item.existing = dated;
         return;
       }
       if (!state.config.hasApiKey) {
@@ -239,7 +264,9 @@ function fillItem(item) {
       });
       if (item.seq !== seq || !batch) return;
       if (after.existing) {
-        item.existing = after.existing;
+        const dated = await applyBatchLearnedDate(after.existing);
+        if (item.seq !== seq || !batch) return;
+        item.existing = dated;
         return;
       }
       item.guess = { ...guess, notes: "", date_learned: batch?.dateLearned || "" };
@@ -499,8 +526,10 @@ async function afterDeckChange() {
 
 function takeDuplicate(entry, item) {
   if (!batch) return;
-  if (entry && !batch.duplicates.some((d) => d.id === entry.id)) {
-    batch.duplicates.push(entry);
+  if (entry) {
+    const i = batch.duplicates.findIndex((d) => d.id === entry.id);
+    if (i < 0) batch.duplicates.push(entry);
+    else if (entry.date_updated) batch.duplicates[i] = entry;
   }
   if (item) {
     const idx = batch.items.indexOf(item);
@@ -745,7 +774,7 @@ function uniqEntries(entries) {
 function summarySection({ entries, stamp, variant, delay = 0 }) {
   if (!entries.length) return "";
   const words = entries.map((entry, i) => `
-    <button type="button" class="dup-word" dir="rtl" data-entry-id="${entry.id}" style="animation-delay:${0.05 + delay + i * 0.07}s">${escapeHtml(entry.word_ar)}</button>
+    <button type="button" class="dup-word" dir="rtl" data-entry-id="${entry.id}" style="animation-delay:${0.05 + delay + i * 0.07}s">${escapeHtml(entry.word_ar)}${entry.date_updated ? `<span class="dup-date-mark" title="Learned date updated">${ICONS.calendar}</span>` : ""}</button>
   `).join("");
   return `
     <div class="dup-section${variant === "added" ? " is-added" : ""}">
@@ -815,7 +844,8 @@ async function commitCurrentWord() {
       if (isBatch()) {
         await dismissTop("skip");
         if (!batch) return;
-        takeDuplicate(err.body.existing, currentBatchItem());
+        const existing = await applyBatchLearnedDate(err.body.existing);
+        takeDuplicate(existing, currentBatchItem());
         await afterDeckChange();
         return;
       }

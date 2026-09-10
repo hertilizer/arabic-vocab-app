@@ -7,6 +7,27 @@ function normalizeDateLearned(value) {
   return m ? m[1] : "";
 }
 
+function shouldApplyLearnedDate(incoming, current) {
+  const next = normalizeDateLearned(incoming);
+  if (!next) return false;
+  const prev = normalizeDateLearned(current);
+  return !prev || next < prev;
+}
+
+function applyLearnedDateIfEarlier(id, date_learned) {
+  const row = db.prepare("SELECT * FROM words WHERE id = ?").get(id);
+  if (!row) return null;
+  const updated = shouldApplyLearnedDate(date_learned, row.date_learned);
+  if (updated) {
+    db.prepare("UPDATE words SET date_learned = ? WHERE id = ?").run(
+      normalizeDateLearned(date_learned),
+      id
+    );
+  }
+  const fresh = db.prepare("SELECT * FROM words WHERE id = ?").get(id);
+  return { updated, entry: rowToEntry(fresh) };
+}
+
 function mountWordRoutes(app) {
   app.get("/api/duplicate", (req, res) => {
     const word_ar = (req.query.word_ar || "").trim();
@@ -79,6 +100,12 @@ function mountWordRoutes(app) {
 
     const row = db.prepare("SELECT * FROM words WHERE id = ?").get(id);
     res.json(rowToEntry(row));
+  });
+
+  app.patch("/api/words/:id/date-learned", (req, res) => {
+    const result = applyLearnedDateIfEarlier(req.params.id, req.body?.date_learned);
+    if (!result) return res.status(404).json({ error: "Not found" });
+    res.json(result);
   });
 
   app.delete("/api/words/:id", (req, res) => {
