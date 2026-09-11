@@ -25,4 +25,10 @@ function requireClient() {
   return anthropic;
 }
 
-module.exports = { hasApiKey, getClient, requireClient, parseJsonResponse };
+// 5-minute ephemeral cache. Writes cost 1.25x input; hits cost 0.1x.
+// Sonnet 4.5 ignores this silently if the prefix is under 1024 tokens.
+function cachedSystem(text) {
+  return [{ type: "text", text, cache_control: { type: "ephemeral" } }];
+}
+
+module.exports = { hasApiKey, getClient, requireClient, parseJsonResponse, cachedSystem };

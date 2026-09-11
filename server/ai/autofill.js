@@ -1,5 +1,5 @@
 const POS_LIST = require("../pos-list");
-const { requireClient, parseJsonResponse } = require("./client");
+const { requireClient, parseJsonResponse, cachedSystem } = require("./client");
 
 const SYSTEM_PROMPT = `You are an expert in Arabic grammar and Levantine/Jordanian dialect (amiya) vocabulary.
 Given a single Arabic word or phrase, produce structured data for a vocabulary notebook.
@@ -68,7 +68,7 @@ async function autofillEntry({ word_ar, note, existing }) {
   const resp = await anthropic.messages.create({
     model: "claude-sonnet-4-5",
     max_tokens: note ? 800 : 500,
-    system: SYSTEM_PROMPT,
+    system: cachedSystem(SYSTEM_PROMPT),
     messages: [{ role: "user", content: buildUserPrompt({ word_ar, note, existing }) }]
   });
   const text = resp.content.map((b) => (b.type === "text" ? b.text : "")).join("");
@@ -83,7 +83,7 @@ You MUST fill "reroll_why" (not "") in 1–3 short English sentences: what you c
   const resp = await anthropic.messages.create({
     model: "claude-sonnet-4-5",
     max_tokens: 800,
-    system: SYSTEM_PROMPT,
+    system: cachedSystem(SYSTEM_PROMPT),
     messages: [
       {
         role: "user",
