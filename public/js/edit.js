@@ -3,7 +3,7 @@ import { api } from "./lib/api.js";
 import { state } from "./lib/state.js";
 import { loadHome } from "./home.js";
 import { openCardDetail, closeCardModal } from "./detail.js";
-import { regenExpandHtml, currentRegenNote, isRegenOpen, setRegenOpen, bindRegenExpand, collapseRegenOnPointerDown, stripRegenMeta, mountRegenAside } from "./lib/regen.js";
+import { regenExpandHtml, currentRegenNote, isRegenOpen, setRegenOpen, bindRegenExpand, collapseRegenOnPointerDown, stripRegenMeta, attachFieldRegen, mountRegenAside } from "./lib/regen.js";
 import { ICONS, quietIconBtn } from "./lib/icons.js";
 
 let editingId = null;
@@ -154,7 +154,7 @@ async function retryEditField(field) {
       body: JSON.stringify({ field, word_ar: existing.word_ar, existing: stripRegenMeta(existing) })
     });
     if (editingId == null) return;
-    writeEditFields({ ...existing, ...result }, { keepAside: true });
+    writeEditFields(attachFieldRegen(existing, result, field));
     btn.classList.remove("is-spinning");
     btn.disabled = false;
   } catch (err) {

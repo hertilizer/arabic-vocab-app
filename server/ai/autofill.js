@@ -40,7 +40,7 @@ Respond with ONLY a raw JSON object, no markdown fences, no preamble, matching t
 
 function sanitizeExisting(existing) {
   if (!existing || typeof existing !== "object") return existing;
-  const { reroll_note, reroll_why, ...rest } = existing;
+  const { reroll_note, reroll_why, reroll_kind, reroll_field, ...rest } = existing;
   return rest;
 }
 
@@ -77,10 +77,12 @@ async function autofillEntry({ word_ar, note, existing }) {
 
 async function autofillField({ field, word_ar, note, existing }) {
   const anthropic = requireClient();
-  const fieldPrompt = `Re-guess ONLY the "${field}" field for this word. Return the same JSON shape as always, but only the "${field}" key needs to be meaningfully changed - you may leave other keys as in the existing guess.`;
+  const fieldPrompt = `This is a SINGLE-FIELD retry, not a full reroll.
+Re-guess ONLY the "${field}" field for this word. Return the same JSON shape as always. Only "${field}" should change unless another key must stay consistent with it.
+You MUST fill "reroll_why" (not "") in 1–3 short English sentences: what you changed in "${field}" and why, OR why you kept the original. Do not rewrite unrelated fields.`;
   const resp = await anthropic.messages.create({
     model: "claude-sonnet-4-5",
-    max_tokens: 500,
+    max_tokens: 800,
     system: SYSTEM_PROMPT,
     messages: [
       {
@@ -90,7 +92,7 @@ async function autofillField({ field, word_ar, note, existing }) {
     ]
   });
   const text = resp.content.map((b) => (b.type === "text" ? b.text : "")).join("");
-  return normalizeGuess(parseJsonResponse(text), note);
+  return normalizeGuess(parseJsonResponse(text), true);
 }
 
 module.exports = { autofillEntry, autofillField };

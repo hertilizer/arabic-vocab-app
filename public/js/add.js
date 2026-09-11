@@ -3,7 +3,7 @@ import { api } from "./lib/api.js";
 import { state } from "./lib/state.js";
 import { ICONS, quietIconBtn } from "./lib/icons.js";
 import { stripHarakat } from "./lib/harakat.js";
-import { regenExpandHtml, currentRegenNote, isRegenOpen, bindRegenExpand, collapseRegenOnPointerDown, stripRegenMeta, attachRegenMeta, mountRegenAside } from "./lib/regen.js";
+import { regenExpandHtml, currentRegenNote, isRegenOpen, bindRegenExpand, collapseRegenOnPointerDown, stripRegenMeta, attachRegenMeta, attachFieldRegen, mountRegenAside } from "./lib/regen.js";
 import { loadHome } from "./home.js";
 import { openCardDetail } from "./detail.js";
 import { noteWordAdded } from "./export.js";
@@ -599,7 +599,7 @@ async function rerollCurrentToBack({ note, existing }) {
         ...guess,
         notes: existingGuess.notes || "",
         date_learned: existingGuess.date_learned || batch.dateLearned || ""
-      }, note);
+      }, note, { kind: "full" });
     } catch (err) {
       if (item.seq !== seq) return;
       item.guess = existingGuess;
@@ -990,9 +990,10 @@ async function retryField(field) {
       body: JSON.stringify({ field, word_ar: state.currentAddGuess.word_ar, existing: stripRegenMeta(state.currentAddGuess) })
     });
     if (!adding) return;
-    state.currentAddGuess = { ...state.currentAddGuess, ...result };
+    state.currentAddGuess = attachFieldRegen(state.currentAddGuess, result, field);
     if (isBatch() && currentBatchItem()) currentBatchItem().guess = state.currentAddGuess;
     writeGuessFields(state.currentAddGuess);
+    mountRegenAside($(".deck-layout"), state.currentAddGuess);
     btn.classList.remove("is-spinning");
     btn.disabled = false;
   } catch (err) {

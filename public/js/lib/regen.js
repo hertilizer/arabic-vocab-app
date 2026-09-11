@@ -5,25 +5,57 @@ import { state } from "./state.js";
 
 export function stripRegenMeta(guess) {
   if (!guess) return guess;
-  const { reroll_note, reroll_why, ...rest } = guess;
+  const { reroll_note, reroll_why, reroll_kind, reroll_field, ...rest } = guess;
   return rest;
 }
 
-export function attachRegenMeta(guess, note) {
+export function attachRegenMeta(guess, note, extra = {}) {
   const next = { ...stripRegenMeta(guess) };
   const n = String(note || "").trim();
   const why = String(guess?.reroll_why || "").trim();
   if (n) next.reroll_note = n;
   if (why) next.reroll_why = why;
+  if (extra.kind) next.reroll_kind = extra.kind;
+  if (extra.field) next.reroll_field = extra.field;
   return next;
 }
+
+export function attachFieldRegen(existing, result, field) {
+  const patch = field === "word_ar_paired"
+    ? { word_ar_paired: result?.word_ar_paired || [] }
+    : (result && result[field] != null ? { [field]: result[field] } : {});
+  return attachRegenMeta({
+    ...existing,
+    ...patch,
+    reroll_why: result?.reroll_why
+  }, "", { kind: "field", field });
+}
+
+const FIELD_LABELS = {
+  word_ar: "Word",
+  root: "Root",
+  part_of_speech: "Part of speech",
+  meaning: "Meaning",
+  word_ar_paired: "Other forms"
+};
 
 export function regenAsideHtml(guess) {
   const note = String(guess?.reroll_note || "").trim();
   const why = String(guess?.reroll_why || "").trim();
+  const field = String(guess?.reroll_field || "").trim();
+  const kind = guess?.reroll_kind === "field" || (!note && field) ? "field" : "full";
+  const fieldLabel = FIELD_LABELS[field] || field;
+  if (kind === "field") {
+    if (!fieldLabel && !why) return "";
+    return `
+    <aside class="reroll-aside is-field">
+      ${fieldLabel ? `<div class="reroll-aside-block"><p class="reroll-aside-kicker">You rerolled</p><p class="reroll-aside-prompt">${escapeHtml(fieldLabel)}</p></div>` : ""}
+      ${why ? `<div class="reroll-aside-block"><p class="reroll-aside-kicker">Why</p><p class="reroll-aside-why">${escapeHtml(why)}</p></div>` : ""}
+    </aside>`;
+  }
   if (!note && !why) return "";
   return `
-    <aside class="reroll-aside">
+    <aside class="reroll-aside is-full">
       ${note ? `<div class="reroll-aside-block"><p class="reroll-aside-kicker">You asked</p><p class="reroll-aside-prompt">${escapeHtml(note)}</p></div>` : ""}
       ${why ? `<div class="reroll-aside-block"><p class="reroll-aside-kicker">Why</p><p class="reroll-aside-why">${escapeHtml(why)}</p></div>` : ""}
     </aside>`;
@@ -38,8 +70,10 @@ export function mountRegenAside(host, guess) {
   if (!host) return;
   const note = String(guess?.reroll_note || "").trim();
   const why = String(guess?.reroll_why || "").trim();
+  const kind = String(guess?.reroll_kind || "");
+  const field = String(guess?.reroll_field || "");
   const cur = host.querySelector(":scope > .reroll-aside");
-  if (cur && cur.dataset.note === note && cur.dataset.why === why) {
+  if (cur && cur.dataset.note === note && cur.dataset.why === why && cur.dataset.kind === kind && cur.dataset.field === field) {
     setAsideOpen(host, true);
     return;
   }
@@ -55,6 +89,8 @@ export function mountRegenAside(host, guess) {
   if (aside) {
     aside.dataset.note = note;
     aside.dataset.why = why;
+    aside.dataset.kind = kind;
+    aside.dataset.field = field;
   }
   if (alreadyOpen) {
     setAsideOpen(host, true);
@@ -140,7 +176,7 @@ export function bindRegenExpand(root, { getExisting, applyGuess, stillActive, st
         body: JSON.stringify({ word_ar: existing.word_ar, note, existing: stripRegenMeta(existing) })
       });
       if (stillActive && !stillActive()) return;
-      applyGuess(attachRegenMeta(guess, note));
+      applyGuess(attachRegenMeta(guess, note, { kind: "full" }));
       btn.classList.remove("is-spinning");
       btn.disabled = false;
       setRegenOpen(false, root);
