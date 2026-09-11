@@ -30,8 +30,11 @@
 #editModal.is-deck {
   overflow: visible;
 }
-.modal.add-modal.is-deck .modal-close {
-  z-index: 20;
+.modal.add-modal.is-deck > .modal-close {
+  display: none;
+}
+.deck-card > .modal-close {
+  z-index: 7;
   top: 10px;
   right: 10px;
 }
@@ -153,7 +156,10 @@
 }
 .deck-card.is-next .entry-actions,
 .deck-card.is-back .entry-actions,
-.deck-card.is-tucking .entry-actions {
+.deck-card.is-tucking .entry-actions,
+.deck-card.is-next > .modal-close,
+.deck-card.is-back > .modal-close,
+.deck-card.is-tucking > .modal-close {
   visibility: hidden;
 }
 .deck-card.is-back,
@@ -179,11 +185,6 @@
 }
 .deck-card.is-flying-skip {
   animation: deck-fly-skip 0.42s cubic-bezier(0.22, 0.8, 0.36, 1) forwards;
-}
-.deck-card.is-flying-reroll-solo {
-  z-index: 6;
-  pointer-events: none;
-  animation: deck-fly-reroll-solo 0.5s cubic-bezier(0.22, 0.8, 0.36, 1);
 }
 .deck-card .entry-form {
   display: flex;
@@ -242,11 +243,6 @@
 }
 @keyframes deck-fly-skip {
   to { transform: translateX(-118%) rotate(-12deg); opacity: 0; }
-}
-@keyframes deck-fly-reroll-solo {
-  0% { transform: none; }
-  45% { transform: translateY(56px) scale(0.96) rotate(-6deg); }
-  100% { transform: none; }
 }
 
 .entry-kicker {

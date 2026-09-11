@@ -50,6 +50,12 @@ function closeAddModal() {
   if (batchAnimating) return;
   if (batch && batch.items.length) {
     if (!confirm("Stop adding this list?")) return;
+    abortAdd();
+    return;
+  }
+  if ($(".deck-card.is-top")) {
+    cancelSingleAdd();
+    return;
   }
   abortAdd();
 }
@@ -133,7 +139,6 @@ async function startAddAutofill(word) {
   }
 
   $("#addModal").classList.remove("hidden");
-  setAddModalKind("deck");
 
   if (!state.config.hasApiKey) {
     state.currentAddGuess = emptyGuess(word_ar);
@@ -141,7 +146,7 @@ async function startAddAutofill(word) {
     return;
   }
 
-  $("#addModalBody").innerHTML = `<div class="deck-layout">${addLoadingHtml(word_ar)}</div>`;
+  renderSoloCard(addLoadingHtml(word_ar));
 
   try {
     const guess = await api("/api/autofill", { method: "POST", body: JSON.stringify({ word_ar }) });
@@ -342,7 +347,7 @@ function deckCardEl(item) {
 }
 
 function setCardLayer(card, i) {
-  card.classList.remove("is-top", "is-next", "is-back", "is-tucking", "is-flying-add", "is-flying-skip", "is-flying-reroll-solo");
+  card.classList.remove("is-top", "is-next", "is-back", "is-tucking", "is-flying-add", "is-flying-skip");
   card.classList.add(layerClass(i));
   if (i === 0) {
     card.removeAttribute("inert");
@@ -384,14 +389,14 @@ function fillCard(card, item, i) {
   if (!item.guess) {
     card.classList.remove("is-blank");
     card.removeAttribute("data-ready");
-    card.innerHTML = addLoadingHtml(item.typed, { isBatch: true });
+    card.innerHTML = withCardClose(addLoadingHtml(item.typed, { isBatch: true }));
     if (i > 0) card.setAttribute("inert", "");
     else card.removeAttribute("inert");
     return;
   }
   card.classList.remove("is-blank");
   card.dataset.ready = "1";
-  card.innerHTML = entryFormHtml(item.guess, { isBatch: true });
+  card.innerHTML = withCardClose(entryFormHtml(item.guess, { isBatch: true }));
   if (i === 0) {
     card.removeAttribute("inert");
     bindTopCard(card, item);
@@ -576,14 +581,39 @@ function currentBatchItem() {
   return batch ? batch.items[0] : null;
 }
 
+function deckCanCycle() {
+  return isBatch() && batch.items.length > 1;
+}
+
+function withCardClose(html) {
+  return `<button class="modal-close" type="button" data-close-add aria-label="Close">&times;</button>${html}`;
+}
+
+function renderSoloCard(innerHtml) {
+  setAddModalKind("deck");
+  $("#addModalBody").innerHTML = `<div class="deck-layout"><div class="deck-scene"><div class="deck-card is-top">${withCardClose(innerHtml)}</div></div></div>`;
+  requestAnimationFrame(syncDeckLayout);
+}
+
+async function cancelSingleAdd() {
+  if (batchAnimating) return;
+  batchAnimating = true;
+  adding = false;
+  try {
+    await dismissTop("skip");
+  } finally {
+    abortAdd();
+  }
+}
+
 async function rerollCurrentToBack({ note, existing }) {
   const item = currentBatchItem();
-  if (!item || !note || batchAnimating) return;
+  if (!item || !note || batchAnimating || !deckCanCycle()) return;
   const existingGuess = { ...(existing || item.guess) };
-    item.seq += 1;
-    const seq = item.seq;
-    item.loading = true;
-    if (batch.items.length > 1) item.guess = null;
+  item.seq += 1;
+  const seq = item.seq;
+  item.loading = true;
+  item.guess = null;
   item.promise = (async () => {
     try {
       const guess = await api("/api/autofill", {
@@ -611,17 +641,6 @@ async function rerollCurrentToBack({ note, existing }) {
       }
     }
   })();
-  if (batch.items.length === 1) {
-    batchAnimating = true;
-    const top = $(".deck-card.is-top");
-    top?.classList.add("is-flying-reroll-solo");
-    if (top) await waitCardAnim(top, 520);
-    top?.classList.remove("is-flying-reroll-solo");
-    batchAnimating = false;
-    if (!batch) return;
-    refreshDeckCard(item);
-    return;
-  }
   try {
     await tuckTopToBack();
     if (!batch) return;
@@ -759,7 +778,7 @@ function bindEntryForm(root) {
       mountRegenAside($(".deck-layout"), state.currentAddGuess);
     },
     stillActive: () => adding,
-    startRegen: isBatch() ? rerollCurrentToBack : undefined
+    startRegen: deckCanCycle() ? rerollCurrentToBack : undefined
   });
 
   const g = state.currentAddGuess;
@@ -787,19 +806,19 @@ function renderAddStepConfirm({ keepRegen = true } = {}) {
   const body = $("#addModalBody");
   const regenNote = keepRegen ? currentRegenNote(body) : "";
   const regenOpen = keepRegen && isRegenOpen(body);
-  setAddModalKind("deck");
-  body.innerHTML = `<div class="deck-layout">${entryFormHtml(g, { isBatch: false })}</div>`;
+  renderSoloCard(entryFormHtml(g, { isBatch: false }));
+  const card = $(".deck-card.is-top", body);
   mountRegenAside($(".deck-layout", body), g);
-  const input = $(".regen-note", body);
+  const input = $(".regen-note", card);
   if (input) {
     input.value = regenNote;
     input.tabIndex = regenOpen ? 0 : -1;
   }
   if (regenOpen) {
-    $(".regen-expand", body)?.classList.add("is-open");
-    $("[data-regen-toggle]", body)?.setAttribute("aria-expanded", "true");
+    $(".regen-expand", card)?.classList.add("is-open");
+    $("[data-regen-toggle]", card)?.setAttribute("aria-expanded", "true");
   }
-  bindEntryForm(body);
+  bindEntryForm(card);
 }
 
 async function skipCurrentBatchItem() {
@@ -877,7 +896,7 @@ function renderResultSummary({ added = [], duplicates = [] } = {}) {
 
 async function commitCurrentWord() {
   if (batchAnimating) return;
-  if (isBatch()) batchAnimating = true;
+  batchAnimating = true;
   syncGuessFromForm();
   const payload = stripRegenMeta({ ...state.currentAddGuess, word_ar_paired: getAddPairedRows().filter((r) => r.word_ar.trim()) });
   try {
@@ -885,6 +904,7 @@ async function commitCurrentWord() {
     noteWordAdded();
     if (!isBatch()) {
       $("#addWordInput").value = "";
+      await dismissTop("add");
       abortAdd();
       loadHome();
       return;
@@ -1009,13 +1029,15 @@ export function initAdd() {
     batchBtn.innerHTML = ICONS.notebook;
     batchBtn.addEventListener("click", openBatchStart);
   }
-  $("[data-close-add]").addEventListener("click", closeAddModal);
   $("#addModal").addEventListener("click", (e) => {
-    if (e.target.id === "addModal") closeAddModal();
+    if (e.target.id === "addModal" || e.target.closest("[data-close-add]")) {
+      closeAddModal();
+      return;
+    }
     const cancel = e.target.closest("[data-cancel-add]");
     if (!cancel || !$("#addModal").contains(cancel)) return;
     if (isBatch()) skipCurrentBatchItem();
-    else abortAdd();
+    else cancelSingleAdd();
   });
   $("#addModal").addEventListener("pointerdown", collapseRegenOnPointerDown);
   $("#addForm").addEventListener("submit", (e) => {

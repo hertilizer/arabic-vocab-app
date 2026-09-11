@@ -128,6 +128,7 @@ export function setRegenOpen(open, root = document) {
   btn.setAttribute("aria-expanded", String(open));
   input.tabIndex = open ? 0 : -1;
   if (open) requestAnimationFrame(() => input.focus());
+  else if (document.activeElement === input) input.blur();
 }
 
 export function bindRegenExpand(root, { getExisting, applyGuess, stillActive, startRegen }) {
@@ -165,6 +166,8 @@ export function bindRegenExpand(root, { getExisting, applyGuess, stillActive, st
     if (!note || btn.classList.contains("is-spinning")) return;
     const existing = getExisting();
     if (startRegen) {
+      input.value = "";
+      setRegenOpen(false, root);
       startRegen({ note, existing });
       return;
     }
