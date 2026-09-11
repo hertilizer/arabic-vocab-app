@@ -151,6 +151,11 @@
   transform: translateY(12px);
   pointer-events: none;
 }
+.deck-card.is-next .entry-actions,
+.deck-card.is-back .entry-actions,
+.deck-card.is-tucking .entry-actions {
+  visibility: hidden;
+}
 .deck-card.is-back,
 .deck-card.is-tucking {
   z-index: 1;
@@ -191,8 +196,45 @@
 .deck-card .entry-form .entry-actions {
   margin-top: auto;
 }
-.deck-card .spinner-text {
-  min-height: calc(100% - 72px);
+
+.entry-form.is-loading .entry-grid {
+  pointer-events: none;
+}
+.entry-form.is-loading .entry-word input {
+  color: var(--text);
+}
+.entry-add-form.is-ghost {
+  pointer-events: none;
+  opacity: 0.4;
+}
+.skel {
+  display: block;
+  height: 42px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  position: relative;
+  overflow: hidden;
+}
+.skel-row { height: 42px; }
+.skel-meaning { height: 7.2rem; }
+.skel-notes { height: 5.2rem; }
+.skel-date { width: 11.5rem; }
+.skel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(201, 163, 90, 0.16) 50%, transparent 100%);
+  transform: translateX(100%);
+  animation: skel-shimmer 1.45s ease-in-out infinite;
+}
+.entry-col + .entry-col .skel::after {
+  animation-delay: 0.18s;
+}
+
+@keyframes skel-shimmer {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
 }
 
 @keyframes deck-fly-add {
@@ -262,20 +304,13 @@
 }
 
 .icon-btn.is-spinning,
-.spinner-text.is-spinning,
 .search-expand-btn.is-spinning {
   pointer-events: none;
   opacity: 0.7;
 }
 .icon-btn.is-spinning svg,
-.spinner-text.is-spinning svg,
 .search-expand-btn.is-spinning svg {
   animation: reroll-spin 0.7s linear infinite;
-}
-.spinner-text.is-spinning svg {
-  width: 22px;
-  height: 22px;
-  color: var(--text-faint);
 }
 @keyframes reroll-spin {
   to { transform: rotate(360deg); }
@@ -630,21 +665,6 @@
   margin-bottom: 14px;
 }
 
-.spinner-text {
-  color: var(--text-dim);
-  font-size: 0.9rem;
-  text-align: center;
-  padding: 20px 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-}
-.spinner-text span {
-  font-family: 'Noto Naskh Arabic', serif;
-  font-size: 1.15rem;
-}
-
 @media (max-width: 1100px) {
   .modal.add-modal.is-deck.has-reroll-aside {
     transform: none;
@@ -668,6 +688,7 @@
 @media (prefers-reduced-motion: reduce) {
   .modal.add-modal.is-deck { transition: none; }
   .reroll-aside { animation: none; }
+  .skel::after { animation: none; }
 }
 
 @media (max-width: 900px) {

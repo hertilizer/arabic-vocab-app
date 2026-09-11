@@ -133,7 +133,7 @@ async function startAddAutofill(word) {
   }
 
   $("#addModal").classList.remove("hidden");
-  setAddModalKind("entry");
+  setAddModalKind("deck");
 
   if (!state.config.hasApiKey) {
     state.currentAddGuess = emptyGuess(word_ar);
@@ -141,7 +141,7 @@ async function startAddAutofill(word) {
     return;
   }
 
-  $("#addModalBody").innerHTML = `<div class="spinner-text is-spinning">${ICONS.reroll}</div>`;
+  $("#addModalBody").innerHTML = `<div class="deck-layout">${addLoadingHtml(word_ar)}</div>`;
 
   try {
     const guess = await api("/api/autofill", { method: "POST", body: JSON.stringify({ word_ar }) });
@@ -375,7 +375,7 @@ function fillCard(card, item, i) {
   card.className = `deck-card ${layerClass(i)}`;
   delete card.dataset.bound;
   delete card.dataset.ready;
-  if (i > 0) {
+  if (i > 1) {
     card.classList.add("is-blank");
     card.innerHTML = "";
     card.setAttribute("inert", "");
@@ -384,12 +384,9 @@ function fillCard(card, item, i) {
   if (!item.guess) {
     card.classList.remove("is-blank");
     card.removeAttribute("data-ready");
-    card.innerHTML = `
-      <div class="spinner-text is-spinning">${ICONS.reroll}<span dir="rtl">${escapeHtml(item.typed)}</span></div>
-      <div class="entry-actions">
-        <button class="btn secondary" data-cancel-add type="button">Skip</button>
-      </div>`;
+    card.innerHTML = addLoadingHtml(item.typed, { isBatch: true });
     if (i > 0) card.setAttribute("inert", "");
+    else card.removeAttribute("inert");
     return;
   }
   card.classList.remove("is-blank");
@@ -429,11 +426,13 @@ function refreshDeckCard(item) {
   if (idx < 0 || idx > 2) return;
   const card = deckCardEl(item);
   if (!card) return;
-  if (idx === 0 && item.guess && card.dataset.ready === "1" && card.dataset.bound === "1") {
+  const sameReady = item.guess && card.dataset.ready === "1" && card.dataset.uid === String(item.uid);
+  if (sameReady && idx === 0 && card.dataset.bound === "1") {
     writeGuessFields(item.guess, card);
     mountRegenAside($(".deck-layout"), item.guess);
     return;
   }
+  if (sameReady && idx > 0) return;
   fillCard(card, item, idx);
   if (idx === 0) {
     state.currentAddWord = item.typed;
@@ -488,8 +487,9 @@ function restackDom() {
       return;
     }
     setCardLayer(card, i);
-    if (i === 0 && item.guess && card.dataset.ready === "1") bindTopCard(card, item);
-    else fillCard(card, item, i);
+    const sameReady = item.guess && card.dataset.ready === "1" && card.dataset.uid === String(item.uid);
+    if (i === 0 && sameReady) bindTopCard(card, item);
+    else if (!(i === 1 && sameReady)) fillCard(card, item, i);
   });
   const topItem = batch.items[0];
   if (topItem) {
@@ -631,6 +631,54 @@ async function rerollCurrentToBack({ note, existing }) {
   } finally {
     batchAnimating = false;
   }
+}
+
+function addLoadingHtml(word, { isBatch = false } = {}) {
+  return `
+    <div class="entry-form is-loading" aria-busy="true">
+      <p class="entry-kicker">Looking up</p>
+      <div class="entry-grid">
+        <div class="entry-col">
+          <div class="entry-field entry-word">
+            <div class="entry-label"><label>Word</label></div>
+            <input dir="rtl" value="${escapeHtml(word)}" readonly tabindex="-1" />
+          </div>
+          <div class="entry-split">
+            <div class="entry-field">
+              <div class="entry-label"><label>Root</label></div>
+              <span class="skel"></span>
+            </div>
+            <div class="entry-field">
+              <div class="entry-label"><label>Part of speech</label></div>
+              <span class="skel"></span>
+            </div>
+          </div>
+          <div class="entry-field">
+            <div class="entry-label"><label>Other forms</label></div>
+            <span class="skel skel-row"></span>
+            <span class="entry-add-form is-ghost">+ Add form</span>
+          </div>
+        </div>
+        <div class="entry-col">
+          <div class="entry-field">
+            <div class="entry-label"><label>Meaning</label></div>
+            <span class="skel skel-meaning"></span>
+          </div>
+          <div class="entry-field">
+            <div class="entry-label"><label>Notes</label></div>
+            <span class="skel skel-notes"></span>
+          </div>
+          <div class="entry-field">
+            <div class="entry-label"><label>Date learned</label></div>
+            <span class="skel skel-date"></span>
+          </div>
+        </div>
+      </div>
+      <div class="entry-actions">
+        <button class="btn secondary" data-cancel-add type="button">${isBatch ? "Skip" : "Cancel"}</button>
+      </div>
+    </div>
+  `;
 }
 
 function posOptions(selected) {
