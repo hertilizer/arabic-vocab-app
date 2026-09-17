@@ -187,27 +187,27 @@ async function fetchAndShowExample() {
   }
 }
 
-export async function openCardDetail(id, { saved = false } = {}) {
-  const entry = await api(`/api/words/${id}`);
+export async function openCardDetail(id, { saved = false, entry = null } = {}) {
+  const word = entry?.word_ar ? entry : await api(`/api/words/${id}`);
   const body = $("#cardModalBody");
-  const notesBlock = entry.notes
-    ? `<div class="detail-block"><div class="detail-kicker">Notes</div><p class="detail-notes">${escapeHtml(entry.notes)}</p></div>`
+  const notesBlock = word.notes
+    ? `<div class="detail-block"><div class="detail-kicker">Notes</div><p class="detail-notes">${escapeHtml(word.notes)}</p></div>`
     : "";
-  const meaning = escapeHtml(entry.meaning) || "No meaning recorded.";
-  const root = (entry.root || "").trim();
-  detailEntry = entry;
+  const meaning = escapeHtml(word.meaning) || "No meaning recorded.";
+  const root = (word.root || "").trim();
+  detailEntry = word;
   resetHarakat();
   body.innerHTML = `
     <div class="flip-face flip-front">
       <div class="detail-kicker-row">
-        ${root ? `<span class="root-chip" id="detailRootChip">${escapeHtml(entry.root)}</span>` : ""}
+        ${root ? `<span class="root-chip" id="detailRootChip">${escapeHtml(word.root)}</span>` : ""}
         ${harakatBtn()}
       </div>
-      <div class="detail-primary${entry.part_of_speech ? " has-pos-tip" : ""}" dir="rtl"${entry.part_of_speech ? ` data-tooltip="${escapeHtml(entry.part_of_speech)}" tabindex="0"` : ""}>${arHtml(entry.word_ar)}</div>
-      ${detailPairedHtml(entry.word_ar_paired)}
+      <div class="detail-primary${word.part_of_speech ? " has-pos-tip" : ""}" dir="rtl"${word.part_of_speech ? ` data-tooltip="${escapeHtml(word.part_of_speech)}" tabindex="0"` : ""}>${arHtml(word.word_ar)}</div>
+      ${detailPairedHtml(word.word_ar_paired)}
       ${notesBlock}
       <div class="detail-footer">
-        <span class="detail-added">${escapeHtml(addedAgo(entryDisplayDate(entry)))}</span>
+        <span class="detail-added">${escapeHtml(addedAgo(entryDisplayDate(word)))}</span>
         ${quietIconBtn({ icon: ICONS.edit, label: "Edit", id: "detailEditBtn" })}
       </div>
     </div>
@@ -227,17 +227,17 @@ export async function openCardDetail(id, { saved = false } = {}) {
 
   $("#detailRootChip")?.addEventListener("click", () => {
     closeCardModal();
-    showRootCluster(entry.root);
+    showRootCluster(word.root);
   });
 
   $("#detailEditBtn").addEventListener("click", () => {
-    openEditModal(entry);
+    openEditModal(word);
   });
 
   setCardFace("front");
   syncHarakatToggle();
   $("#cardModal").classList.remove("hidden");
-  if (saved) flashSaved(addedAgo(entryDisplayDate(entry)));
+  if (saved) flashSaved(addedAgo(entryDisplayDate(word)));
 }
 
 function flashSaved(restoreText) {
@@ -260,6 +260,7 @@ export function closeCardModal() {
   resetHarakat();
   setCardFace("front");
   $("#cardModal").classList.add("hidden");
+  $("#cardModal").classList.remove("from-add");
 }
 
 export function initDetail() {

@@ -74,6 +74,14 @@ function rowToEntry(row) {
   };
 }
 
+const {
+  verbCore,
+  familyKey,
+  classifyEntry,
+  sameStem,
+  stemPayload
+} = require("./stems");
+
 function isVerbPos(pos) {
   return String(pos || "").startsWith("فعل");
 }
@@ -85,59 +93,135 @@ function entryForms(row) {
   return [row.word_ar, ...paired.map((f) => f.word_ar)].filter(Boolean);
 }
 
-// Peel common Levantine/MSA verb prefixes and person suffixes so
-// كتبت / يكتب / بكتب collapse to the same core (كتب).
-function verbCore(word) {
-  let s = stripHarakat(word).trim();
-  if (!s) return "";
-  const prefixes = ["عم", "رح", "بي", "بت", "بن", "ب", "ي", "ت", "ن", "أ", "ا", "ح"];
-  for (const p of prefixes) {
-    if (s.startsWith(p) && s.length - p.length >= 3) {
-      s = s.slice(p.length);
-      break;
-    }
-  }
-  const suffixes = ["تما", "تمو", "تون", "تم", "تن", "تي", "وا", "ون", "ين", "ان", "نا", "ت", "ن", "ا", "و"];
-  suffixes.sort((a, b) => b.length - a.length);
-  for (const suf of suffixes) {
-    if (s.endsWith(suf) && s.length - suf.length >= 3) {
-      s = s.slice(0, -suf.length);
-      break;
-    }
-  }
-  return s;
+function entryPaired(row) {
+  return Array.isArray(row.word_ar_paired)
+    ? row.word_ar_paired
+    : JSON.parse(row.word_ar_paired || "[]");
 }
 
-function findDuplicate(word_ar, { excludeId, root = "", part_of_speech = "", word_ar_paired = [] } = {}) {
-  const incoming = [word_ar, ...(word_ar_paired || []).map((f) => f.word_ar)].filter(Boolean);
-  if (!incoming.length) return null;
-
+function findExactFormMatch(incoming, { excludeId } = {}) {
   const skip = (row) => excludeId && Number(row.id) === Number(excludeId);
-
   for (const form of incoming) {
     const key = stripHarakat(form).trim();
     if (!key) continue;
     const rows = db.prepare("SELECT * FROM words WHERE search_blob LIKE ?").all(`%${key}%`);
     for (const row of rows) {
       if (skip(row)) continue;
-      if (entryForms(row).some((f) => stripHarakat(f) === key)) return rowToEntry(row);
-    }
-  }
-
-  const treatAsVerb = !part_of_speech || isVerbPos(part_of_speech);
-  if (treatAsVerb) {
-    const cores = [...new Set(incoming.map(verbCore).filter((c) => c.length >= 3))];
-    if (cores.length) {
-      const verbs = db.prepare("SELECT * FROM words WHERE part_of_speech LIKE 'فعل%'").all();
-      for (const row of verbs) {
-        if (skip(row)) continue;
-        const existingCores = entryForms(row).map(verbCore);
-        if (existingCores.some((c) => cores.includes(c))) return rowToEntry(row);
+      const hit = entryForms(row).some((f) => stripHarakat(f) === key);
+      if (!hit) continue;
+      if (familyKey(form).length === 3) {
+        const incomingForm = classifyEntry(form, []);
+        const existingForm = classifyEntry(row.word_ar, entryPaired(row));
+        if (!sameStem(incomingForm, existingForm)) continue;
       }
+      return rowToEntry(row);
     }
   }
-
   return null;
 }
 
-module.exports = { db, stripHarakat, buildSearchBlob, rowToEntry, findDuplicate };
+function verbRows(excludeId) {
+  return db.prepare("SELECT * FROM words WHERE part_of_speech LIKE 'فعل%'").all()
+    .filter((row) => !(excludeId && Number(row.id) === Number(excludeId)));
+}
+
+function checkDuplicate(word_ar, { excludeId, part_of_speech = "", word_ar_paired = [] } = {}) {
+  const incoming = [word_ar, ...(word_ar_paired || []).map((f) => f.word_ar)].filter(Boolean);
+  const stems = stemPayload(word_ar, word_ar_paired);
+  const finish = (result) => decorateFamily({ ...result, stems }, excludeId);
+  if (!incoming.length) return finish({ existing: null, collision: null });
+
+  const exact = findExactFormMatch(incoming, { excludeId });
+  if (exact) return finish({ existing: exact, collision: null });
+
+  const treatAsVerb = !part_of_speech || isVerbPos(part_of_speech);
+  if (!treatAsVerb) return finish({ existing: null, collision: null });
+
+  const incomingKey = familyKey(word_ar) || incoming.map(familyKey).find((k) => k.length >= 3) || "";
+  const incomingForm = classifyEntry(word_ar, word_ar_paired);
+  const verbs = verbRows(excludeId);
+
+  if (incomingKey.length !== 3 || incomingForm === "other") {
+    const cores = [...new Set(incoming.map(verbCore).filter((c) => c.length >= 3))];
+    if (cores.length) {
+      for (const row of verbs) {
+        const existingCores = entryForms(row).map(verbCore);
+        if (existingCores.some((c) => cores.includes(c))) {
+          return finish({ existing: rowToEntry(row), collision: null });
+        }
+      }
+    }
+    return finish({ existing: null, collision: null });
+  }
+
+  const familyHits = verbs.filter((row) => (
+    familyKey(row.word_ar) === incomingKey
+    || entryForms(row).some((f) => familyKey(f) === incomingKey)
+  ));
+
+  for (const row of familyHits) {
+    const existingForm = classifyEntry(row.word_ar, entryPaired(row));
+    if (sameStem(incomingForm, existingForm)) {
+      return finish({ existing: rowToEntry(row), collision: null });
+    }
+  }
+
+  if (familyHits.length) {
+    const row = familyHits[0];
+    const existingForm = classifyEntry(row.word_ar, entryPaired(row));
+    return finish({
+      existing: null,
+      collision: {
+        existing: rowToEntry(row),
+        existingForm,
+        incomingForm
+      }
+    });
+  }
+
+  return finish({ existing: null, collision: null });
+}
+
+function decorateFamily(result, excludeId) {
+  const stems = result.stems;
+  if (!stems || stems.family !== "I-II-IV" || !stems.forms) return result;
+  const verbs = verbRows(excludeId);
+  const key = stems.radicals;
+  const familyHits = verbs.filter((row) => (
+    familyKey(row.word_ar) === key
+    || entryForms(row).some((f) => familyKey(f) === key)
+  ));
+  const takenEntries = {};
+  const taken = [];
+  for (const row of familyHits) {
+    const form = classifyEntry(row.word_ar, entryPaired(row));
+    if (form !== "I" && form !== "II" && form !== "IV") continue;
+    if (!takenEntries[form]) takenEntries[form] = rowToEntry(row);
+    if (!taken.includes(form)) taken.push(form);
+  }
+  result.taken = taken;
+  result.takenEntries = takenEntries;
+  result.otherStems = ["I", "II", "IV"].filter((form) => !taken.includes(form) && stems.forms[form]);
+  if (result.existing) {
+    result.existingForm = classifyEntry(result.existing.word_ar, result.existing.word_ar_paired);
+    if (result.existingForm === "I" || result.existingForm === "II" || result.existingForm === "IV") {
+      takenEntries[result.existingForm] = takenEntries[result.existingForm] || result.existing;
+      if (!taken.includes(result.existingForm)) taken.push(result.existingForm);
+    }
+  }
+  if (result.collision) result.collision.taken = taken;
+  return result;
+}
+
+function findDuplicate(word_ar, opts = {}) {
+  return checkDuplicate(word_ar, opts).existing;
+}
+
+module.exports = {
+  db,
+  stripHarakat,
+  buildSearchBlob,
+  rowToEntry,
+  findDuplicate,
+  checkDuplicate
+};

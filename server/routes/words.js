@@ -1,4 +1,5 @@
-const { db, buildSearchBlob, stripHarakat, rowToEntry, findDuplicate } = require("../db");
+const { db, buildSearchBlob, stripHarakat, rowToEntry, checkDuplicate } = require("../db");
+const { applyStem } = require("../stems");
 
 function normalizeDateLearned(value) {
   const s = String(value ?? "").trim();
@@ -32,21 +33,33 @@ function mountWordRoutes(app) {
   app.get("/api/duplicate", (req, res) => {
     const word_ar = (req.query.word_ar || "").trim();
     if (!word_ar) return res.status(400).json({ error: "word_ar is required" });
-    res.json({ existing: findDuplicate(word_ar) });
+    res.json(checkDuplicate(word_ar));
   });
 
   app.post("/api/duplicate", (req, res) => {
     const { word_ar, root, part_of_speech, word_ar_paired } = req.body || {};
     if (!word_ar) return res.status(400).json({ error: "word_ar is required" });
-    res.json({ existing: findDuplicate(word_ar, { root, part_of_speech, word_ar_paired }) });
+    res.json(checkDuplicate(word_ar, { root, part_of_speech, word_ar_paired }));
+  });
+
+  app.post("/api/stems/apply", (req, res) => {
+    const { word_ar, word_ar_paired = [], form } = req.body || {};
+    if (!word_ar || !form) return res.status(400).json({ error: "word_ar and form are required" });
+    const check = checkDuplicate(word_ar, { word_ar_paired });
+    const next = applyStem(check.stems, form);
+    if (!next) return res.status(400).json({ error: "Could not build that stem" });
+    res.json({ ...next, stems: check.stems });
   });
 
   app.post("/api/words", (req, res) => {
-    const { word_ar, word_ar_paired = [], root = "", part_of_speech = "", meaning = "", notes = "", date_learned = "" } = req.body;
+    const { word_ar, word_ar_paired = [], root = "", part_of_speech = "", meaning = "", notes = "", date_learned = "", allowNewStem = false } = req.body;
     if (!word_ar) return res.status(400).json({ error: "word_ar is required" });
-    const existing = findDuplicate(word_ar, { root, part_of_speech, word_ar_paired });
-    if (existing) {
-      return res.status(409).json({ error: "DUPLICATE", existing });
+    const check = checkDuplicate(word_ar, { root, part_of_speech, word_ar_paired });
+    if (check.existing) {
+      return res.status(409).json({ error: "DUPLICATE", ...check });
+    }
+    if (check.collision && !allowNewStem) {
+      return res.status(409).json({ error: "STEM_COLLISION", ...check });
     }
     const search_blob = buildSearchBlob(word_ar, word_ar_paired);
     const learned = normalizeDateLearned(date_learned);

@@ -3,7 +3,7 @@ import { api } from "./lib/api.js";
 import { state } from "./lib/state.js";
 import { ICONS, quietIconBtn } from "./lib/icons.js";
 import { stripHarakat } from "./lib/harakat.js";
-import { regenExpandHtml, currentRegenNote, isRegenOpen, bindRegenExpand, collapseRegenOnPointerDown, stripRegenMeta, attachRegenMeta, attachFieldRegen, mountRegenAside } from "./lib/regen.js";
+import { regenExpandHtml, currentRegenNote, isRegenOpen, bindRegenExpand, collapseRegenOnPointerDown, stripAutofillExisting, attachRegenMeta, attachFieldRegen, mountRegenAside } from "./lib/regen.js";
 import { loadHome } from "./home.js";
 import { openCardDetail } from "./detail.js";
 import { noteWordAdded } from "./export.js";
@@ -64,6 +64,476 @@ function emptyGuess(word_ar, date_learned = "") {
   return { word_ar, root: "", part_of_speech: "", meaning: "", word_ar_paired: [], notes: "", date_learned };
 }
 
+const STEM_AUTOFILL_NOTES = {
+  I: "Treat this as Form I (الفعل المجرد / فَعَلَ). word_ar is the 3ms present of Form I. Fill past and imperative as Form I. Do not switch it to Form II or Form IV.",
+  II: "Treat this as Form II (فَعَّلَ / يُفَعِّلُ), with shadda on the middle radical. word_ar is the 3ms present of Form II. Fill past and imperative as Form II. Do not treat it as Form I even if the letters match.",
+  IV: "Treat this as Form IV (أَفْعَلَ / يُفْعِلُ). word_ar is the 3ms present يُفْعِلُ (damma on the prefix, no shadda). Past is أَفْعَلَ. Fill meaning for the Form IV verb. Do not treat it as Form I even if the unvoweled letters match."
+};
+
+const STEM_FORMS = ["I", "II", "IV"];
+
+function attachStems(guess, check) {
+  if (!guess) return guess;
+  const stems = check?.stems || guess.stems;
+  if (!stems) return guess;
+  const form = STEM_FORMS.includes(guess.stemForm) ? guess.stemForm : (STEM_FORMS.includes(stems.form) ? stems.form : "I");
+  return { ...guess, stems, stemForm: form };
+}
+
+function currentStemForm(g) {
+  if (STEM_FORMS.includes(g?.stemForm)) return g.stemForm;
+  if (STEM_FORMS.includes(g?.stems?.form)) return g.stems.form;
+  return "I";
+}
+
+function cloneStemSnapshot(g) {
+  if (!g) return g;
+  const { stemVersions, ...rest } = g;
+  return {
+    ...rest,
+    word_ar_paired: (g.word_ar_paired || []).map((row) => ({ ...row }))
+  };
+}
+
+function storeStemVersion(host, form, snapshot) {
+  const stems = host?.stems || snapshot?.stems;
+  const versions = { ...(host?.stemVersions || {}) };
+  versions[form] = cloneStemSnapshot({ ...snapshot, stemForm: form, stems, stemVersions: undefined });
+  return {
+    ...snapshot,
+    stems,
+    stemForm: form,
+    stemVersions: versions,
+    allowNewStem: snapshot.allowNewStem || host?.allowNewStem || form !== (stems?.form || "I")
+  };
+}
+
+function rememberCurrentStem(g) {
+  if (!g?.stems || g.stems.family !== "I-II-IV") return g;
+  if (!g.meaning && !(g.word_ar_paired || []).length && !g.root) return g;
+  return storeStemVersion(g, currentStemForm(g), g);
+}
+
+function restoreStemVersion(g, form) {
+  const cached = g?.stemVersions?.[form];
+  if (!cached) return null;
+  return {
+    ...cloneStemSnapshot(cached),
+    stems: g.stems,
+    stemForm: form,
+    stemVersions: g.stemVersions,
+    date_learned: g.date_learned,
+    allowNewStem: cached.allowNewStem || g.allowNewStem || form !== (g.stems?.form || "I")
+  };
+}
+
+function paintCurrentGuess() {
+  const g = state.currentAddGuess;
+  if (!g) return;
+  if (isBatch()) {
+    const item = currentBatchItem();
+    if (item) item.guess = g;
+    const card = formRoot();
+    if (!card || !card.classList.contains("deck-card")) {
+      renderDeck();
+      return;
+    }
+    card.innerHTML = withCardClose(entryFormHtml(g, { isBatch: true }));
+    delete card.dataset.bound;
+    bindTopCard(card, item);
+    mountRegenAside($(".deck-layout"), g);
+    requestAnimationFrame(syncDeckLayout);
+    return;
+  }
+  renderAddStepConfirm({ keepRegen: false });
+}
+
+function setCurrentGuess(next) {
+  state.currentAddGuess = next;
+  saveGuessToJob(next);
+  if (isBatch() && currentBatchItem()) currentBatchItem().guess = next;
+}
+
+const stemJobs = Object.create(null);
+
+function familyKeyOf(stems) {
+  return stems?.family === "I-II-IV" && stems.radicals ? stems.radicals : "";
+}
+
+function isTakenStem(g, form = currentStemForm(g)) {
+  const taken = g?.takenStems || stemJobs[familyKeyOf(g?.stems)]?.taken || [];
+  return taken.includes(form);
+}
+
+function snapshotFromEntry(entry, form, stems) {
+  if (!entry) return null;
+  return {
+    word_ar: entry.word_ar,
+    root: entry.root || "",
+    part_of_speech: entry.part_of_speech || "",
+    meaning: entry.meaning || "",
+    notes: entry.notes || "",
+    word_ar_paired: (entry.word_ar_paired || []).map((row) => ({ ...row })),
+    date_learned: entry.date_learned || "",
+    stemForm: form,
+    stems,
+    existingId: entry.id
+  };
+}
+
+function saveGuessToJob(g) {
+  const key = familyKeyOf(g?.stems);
+  if (!key || !g) return;
+  const job = stemJobs[key] || (stemJobs[key] = { key, typed: state.currentAddWord || "", stems: g.stems, versions: {}, promises: {}, taken: [] });
+  job.stems = g.stems || job.stems;
+  const form = currentStemForm(g);
+  if (job.taken.includes(form) && job.versions[form]?.existingId) return;
+  job.versions[form] = cloneStemSnapshot(g);
+}
+
+function ensureStemJob({ typed, stems, seed, taken, takenEntries } = {}) {
+  const key = familyKeyOf(stems);
+  if (!key) return null;
+  if (!stemJobs[key]) {
+    stemJobs[key] = { key, typed: typed || "", stems, versions: {}, promises: {}, taken: [], takenEntries: {} };
+  }
+  const job = stemJobs[key];
+  job.stems = stems || job.stems;
+  if (typed) job.typed = typed;
+  if (takenEntries) {
+    job.takenEntries = { ...(job.takenEntries || {}), ...takenEntries };
+  }
+  const takenSet = new Set([
+    ...(Array.isArray(taken) ? taken : job.taken || []),
+    ...Object.keys(job.takenEntries || {})
+  ]);
+  job.taken = STEM_FORMS.filter((form) => takenSet.has(form));
+  for (const form of job.taken) {
+    const entry = job.takenEntries[form];
+    if (entry) job.versions[form] = snapshotFromEntry(entry, form, job.stems);
+    if (job.promises[form]) {
+      delete job.promises[form];
+    }
+  }
+  const seedVersions = seed?.stemVersions || {};
+  for (const form of STEM_FORMS) {
+    if (job.taken.includes(form)) continue;
+    if (seedVersions[form] && !job.versions[form]) {
+      job.versions[form] = cloneStemSnapshot(seedVersions[form]);
+    }
+  }
+  if (seed?.stems && (seed.meaning || seed.root || (seed.word_ar_paired || []).length)) {
+    const form = currentStemForm(seed);
+    if (!job.taken.includes(form) && !job.versions[form]) job.versions[form] = cloneStemSnapshot(seed);
+  }
+  for (const form of STEM_FORMS) {
+    if (job.taken.includes(form) || job.versions[form] || job.promises[form]) continue;
+    const word_ar = job.typed;
+    job.promises[form] = autofillAsStem(form, word_ar, {
+      stems: job.stems,
+      word_ar,
+      date_learned: seed?.date_learned || batch?.dateLearned || ""
+    }).then((guess) => {
+      if (job.taken.includes(form) && job.takenEntries[form]) {
+        job.versions[form] = snapshotFromEntry(job.takenEntries[form], form, job.stems);
+        return job.versions[form];
+      }
+      if (!job.versions[form]) {
+        job.versions[form] = cloneStemSnapshot({ ...guess, stemForm: form, stems: job.stems });
+      }
+      return job.versions[form];
+    }).finally(() => {
+      delete job.promises[form];
+    });
+  }
+  return job;
+}
+
+function availableStemForms(job, g) {
+  const taken = new Set(g?.takenStems || job?.taken || []);
+  return STEM_FORMS.filter((form) => !taken.has(form));
+}
+
+function defaultNewStem(check, job) {
+  const available = job ? availableStemForms(job) : STEM_FORMS.filter((form) => !(check?.taken || []).includes(form));
+  const incoming = check?.collision?.incomingForm;
+  if (incoming && available.includes(incoming)) return incoming;
+  return available[0] || null;
+}
+
+function buildGuessFromJob(job, form, extras = {}) {
+  const snap = job?.versions?.[form];
+  if (!snap) return null;
+  const stemVersions = {};
+  for (const f of STEM_FORMS) {
+    if (job.versions[f]) stemVersions[f] = cloneStemSnapshot(job.versions[f]);
+  }
+  return {
+    ...cloneStemSnapshot(snap),
+    stems: job.stems,
+    stemForm: form,
+    stemVersions,
+    takenStems: [...(job.taken || [])],
+    existingId: snap.existingId,
+    date_learned: extras.date_learned ?? snap.date_learned ?? "",
+    allowNewStem: !job.taken.includes(form)
+  };
+}
+
+async function waitStemForm(job, form) {
+  if (!job) return null;
+  if (job.versions[form]) return job.versions[form];
+  if (job.taken?.includes(form)) return job.versions[form] || null;
+  if (job.promises[form]) return job.promises[form];
+  ensureStemJob({ typed: job.typed, stems: job.stems, taken: job.taken, takenEntries: job.takenEntries });
+  if (job.versions[form]) return job.versions[form];
+  if (job.promises[form]) return job.promises[form];
+  return null;
+}
+
+async function waitAllStems(job) {
+  if (!job) return;
+  await Promise.all(availableStemForms(job).map((form) => waitStemForm(job, form).catch(() => null)));
+}
+
+function preferredStemForm(stems) {
+  return STEM_FORMS.includes(stems?.form) ? stems.form : "I";
+}
+
+function asCollisionCheck(check) {
+  if (!check) return check;
+  if (check.collision) return check;
+  if (!check.existing || !check.otherStems?.length) return check;
+  return {
+    ...check,
+    collision: {
+      existing: check.existing,
+      existingForm: check.existingForm || "I",
+      incomingForm: check.stems?.form || "unknown",
+      taken: check.taken || []
+    }
+  };
+}
+
+function stemSwitchHtml(g) {
+  const stems = g?.stems;
+  if (stems?.family !== "I-II-IV" || !stems.forms) return "";
+  const current = currentStemForm(g);
+  if (current === "other") return "";
+  const job = stemJobs[familyKeyOf(stems)];
+  const taken = new Set(g.takenStems || job?.taken || []);
+  const labels = { I: "I", II: "II", IV: "IV" };
+  return `<div class="stem-switch" data-stem-switch>
+    ${STEM_FORMS.map((form) => {
+      const dbWord = job?.takenEntries?.[form]?.word_ar || (job?.versions?.[form]?.existingId ? job.versions[form].word_ar : "");
+      const present = dbWord || stems.forms[form]?.present || "";
+      const isTaken = taken.has(form);
+      return `<button type="button" class="stem-switch-btn${form === current ? " is-active" : ""}${isTaken ? " is-taken" : ""}" data-stem-form="${form}">
+        ${isTaken ? `<span class="stem-switch-taken" title="Already in the notebook">${ICONS.check}</span>` : ""}
+        <span class="stem-switch-form">${labels[form]}</span>
+        <span class="stem-switch-word" dir="rtl">${escapeHtml(present)}</span>
+      </button>`;
+    }).join("")}
+  </div>`;
+}
+
+function bindStemSwitch(root) {
+  $$("[data-stem-form]", root).forEach((btn) => {
+    btn.addEventListener("click", () => applyStemForm(btn.dataset.stemForm));
+  });
+}
+
+async function applyStemForm(form) {
+  if (!form || batchAnimating) return;
+  if (!isTakenStem(state.currentAddGuess)) {
+    syncGuessFromForm();
+    const remembered = rememberCurrentStem(state.currentAddGuess);
+    if (remembered) setCurrentGuess(remembered);
+  }
+  const g = state.currentAddGuess;
+  if (!g) return;
+  if (form === currentStemForm(g)) return;
+  await showStemForm(form, {
+    typed: state.currentAddWord || g.word_ar,
+    guess: g,
+    stems: g.stems,
+    instant: true
+  });
+}
+
+async function autofillAsStem(form, word_ar, previous) {
+  const { stemVersions: _versions, ...prior } = previous || emptyGuess(word_ar);
+  const applied = await api("/api/stems/apply", {
+    method: "POST",
+    body: JSON.stringify({
+      word_ar,
+      word_ar_paired: prior.word_ar_paired || [],
+      form
+    })
+  });
+  const note = STEM_AUTOFILL_NOTES[form];
+  let guess = {
+    ...prior,
+    ...applied,
+    meaning: "",
+    notes: prior.notes || "",
+    date_learned: prior.date_learned || batch?.dateLearned || ""
+  };
+  if (state.config.hasApiKey) {
+    const filled = await api("/api/autofill", {
+      method: "POST",
+      body: JSON.stringify({
+        word_ar: applied.word_ar,
+        note,
+        existing: stripAutofillExisting(guess)
+      })
+    });
+    guess = attachRegenMeta({
+      ...filled,
+      word_ar: applied.word_ar,
+      word_ar_paired: applied.word_ar_paired,
+      root: filled.root || applied.root,
+      part_of_speech: filled.part_of_speech || applied.part_of_speech,
+      notes: prior.notes || "",
+      date_learned: guess.date_learned
+    }, note, { kind: "full" });
+  }
+  return attachStems({
+    ...guess,
+    allowNewStem: true,
+    stemForm: form
+  }, { stems: applied.stems || previous?.stems });
+}
+
+async function showStemForm(form, { typed, guess, stems, instant = false } = {}) {
+  const word_ar = typed || state.currentAddWord || guess?.word_ar;
+  const stemSrc = stems || guess?.stems || state.currentAddGuess?.stems;
+  if (!word_ar || !form) return;
+  adding = true;
+  const job = ensureStemJob({
+    typed: word_ar,
+    stems: stemSrc,
+    seed: guess || state.currentAddGuess,
+    taken: (guess || state.currentAddGuess)?.takenStems,
+    takenEntries: stemJobs[familyKeyOf(stemSrc)]?.takenEntries
+  });
+  const ready = job && job.versions[form];
+  const item = isBatch() ? currentBatchItem() : null;
+  if (!ready) {
+    if (item) {
+      item.loading = true;
+      refreshDeckCard(item);
+    } else {
+      $("#addModal").classList.remove("hidden");
+      renderSoloCard(addLoadingHtml(word_ar));
+    }
+    try {
+      await waitAllStems(job);
+    } catch (err) {
+      if (item) item.loading = false;
+      alert(err.message || "Could not fill that form");
+      if (guess) {
+        setCurrentGuess(guess);
+        if (item && batch) refreshDeckCard(item);
+        else renderAddStepConfirm({ keepRegen: false });
+      }
+      return;
+    }
+  } else if (!instant) {
+    await waitAllStems(job);
+  }
+  if (!adding) return;
+  const next = buildGuessFromJob(job, form, {
+    date_learned: state.currentAddGuess?.date_learned || guess?.date_learned || batch?.dateLearned || ""
+  });
+  if (!next) {
+    alert("Could not fill that form");
+    return;
+  }
+  setCurrentGuess(next);
+  if (item && batch) {
+    item.collisionCheck = null;
+    item.stemResolved = true;
+    item.loading = false;
+    if (ready && instant && formRoot()?.querySelector("[data-stem-switch]")) {
+      paintCurrentGuess();
+      return;
+    }
+    renderDeck();
+    return;
+  }
+  if (ready && instant && formRoot()?.querySelector("[data-stem-switch]")) {
+    paintCurrentGuess();
+    return;
+  }
+  renderAddStepConfirm({ keepRegen: true });
+}
+
+function chooseStemForm(form, opts = {}) {
+  return showStemForm(form, opts);
+}
+
+function formLabel(form) {
+  if (form === "II") return "Form II";
+  if (form === "IV") return "Form IV";
+  if (form === "I") return "Form I";
+  return "this verb";
+}
+
+function renderStemCollision(check, guess) {
+  adding = true;
+  ensureStemJob({
+    typed: state.currentAddWord || guess?.word_ar,
+    stems: check.stems,
+    seed: guess,
+    taken: check.collision?.taken || check.taken,
+    takenEntries: check.takenEntries
+  });
+  $("#addModal").classList.remove("hidden");
+  setAddModalKind("dup");
+  const existing = check.collision.existing;
+  const taken = new Set(check.collision.taken || [check.collision.existingForm]);
+  const forms = check.stems?.forms || {};
+  const options = ["I", "II", "IV"].filter((form) => !taken.has(form) && forms[form]);
+  $("#addModalBody").innerHTML = `
+    <div class="dup-notice collision-notice">
+      <p class="collision-kicker">Same letters, maybe a different Form</p>
+      <p class="collision-copy">
+        ${escapeHtml(formLabel(check.collision.existingForm))} is already in the notebook.
+        Same word, or add another stem of this root?
+      </p>
+      <button type="button" class="dup-word" dir="rtl" data-collision-same>${escapeHtml(existing.word_ar)}</button>
+      <p class="dup-stamp" dir="rtl">في الدفتر</p>
+      ${options.length ? `
+        <div class="stem-choices">
+          ${options.map((form) => `
+            <button type="button" class="stem-choice" data-collision-stem="${form}">
+              <span class="stem-choice-label">${escapeHtml(formLabel(form))}</span>
+              <span class="stem-choice-word" dir="rtl">${escapeHtml(forms[form].present)}</span>
+            </button>
+          `).join("")}
+        </div>
+      ` : ""}
+      <div class="entry-actions">
+        <button class="btn secondary" data-cancel-add type="button">Cancel</button>
+        <span></span>
+      </div>
+    </div>
+  `;
+  $("[data-collision-same]")?.addEventListener("click", () => openExistingWord(existing));
+  $$("[data-collision-stem]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const form = btn.dataset.collisionStem;
+      const base = guess || emptyGuess(state.currentAddWord || existing.word_ar);
+      chooseStemForm(form, {
+        typed: state.currentAddWord || base.word_ar,
+        guess: state.currentAddGuess || base,
+        stems: check.stems
+      });
+    });
+  });
+}
+
 function shouldApplyBatchDate(current, batchDate) {
   const next = String(batchDate || "").trim();
   if (!next) return false;
@@ -109,9 +579,32 @@ function parseWordList(text) {
 }
 
 async function openExistingWord(entry) {
-  abortAdd();
+  if (!entry?.id || batchAnimating) return;
   $("#addWordInput").value = "";
-  openCardDetail(entry.id);
+  adding = false;
+  const pending = api(`/api/words/${entry.id}`);
+  const flying = $(".deck-card.is-top") ? dismissTop("skip") : Promise.resolve();
+  let word;
+  try {
+    word = await pending;
+  } catch {
+    await flying.catch(() => {});
+    abortAdd();
+    return;
+  }
+  const cardModal = $("#cardModal");
+  cardModal?.classList.add("from-add");
+  try {
+    await openCardDetail(entry.id, { entry: word });
+    const incoming = cardModal?.querySelector(".flip-scene");
+    await Promise.all([
+      flying,
+      incoming ? waitCardAnim(incoming, 430) : Promise.resolve()
+    ]);
+  } finally {
+    cardModal?.classList.remove("from-add");
+    abortAdd();
+  }
 }
 
 async function startAddAutofill(word) {
@@ -122,26 +615,58 @@ async function startAddAutofill(word) {
   state.currentAddWord = word_ar;
   state.currentAddGuess = null;
 
+  let lastCheck = null;
   try {
-    const { existing } = await api("/api/duplicate", {
+    lastCheck = await api("/api/duplicate", {
       method: "POST",
       body: JSON.stringify({ word_ar })
     });
-    if (existing) {
-      $("#addModal").classList.remove("hidden");
-      renderResultSummary({ duplicates: [existing] });
-      return;
-    }
   } catch (err) {
     adding = false;
     alert(err.message || "Could not check for duplicates");
     return;
   }
 
+  const job = lastCheck?.stems ? ensureStemJob({ typed: word_ar, stems: lastCheck.stems, taken: lastCheck.taken || [], takenEntries: lastCheck.takenEntries }) : null;
+
+  if (lastCheck.existing) {
+    $("#addModal").classList.remove("hidden");
+    renderResultSummary({
+      duplicates: [lastCheck.existing],
+      check: lastCheck,
+      typedWord: word_ar
+    });
+    return;
+  }
+
   $("#addModal").classList.remove("hidden");
 
+  if (lastCheck?.collision) {
+    renderStemCollision(lastCheck, emptyGuess(word_ar));
+    return;
+  }
+
+  if (job) {
+    renderSoloCard(addLoadingHtml(word_ar));
+    try {
+      await waitAllStems(job);
+      if (!adding) return;
+      const next = buildGuessFromJob(job, preferredStemForm(lastCheck.stems), {
+        date_learned: ""
+      });
+      if (!next) throw new Error("Could not fill that form");
+      setCurrentGuess(next);
+      renderAddStepConfirm();
+    } catch (err) {
+      if (!adding) return;
+      abortAdd();
+      alert(err.message || "Autofill failed");
+    }
+    return;
+  }
+
   if (!state.config.hasApiKey) {
-    state.currentAddGuess = emptyGuess(word_ar);
+    state.currentAddGuess = rememberCurrentStem(attachStems(emptyGuess(word_ar), lastCheck));
     renderAddStepConfirm();
     return;
   }
@@ -151,15 +676,24 @@ async function startAddAutofill(word) {
   try {
     const guess = await api("/api/autofill", { method: "POST", body: JSON.stringify({ word_ar }) });
     if (!adding) return;
-    const { existing } = await api("/api/duplicate", {
+    const check = await api("/api/duplicate", {
       method: "POST",
       body: JSON.stringify(guess)
     });
-    if (existing) {
-      renderResultSummary({ duplicates: [existing] });
+    if (check.existing) {
+      renderResultSummary({
+        duplicates: [check.existing],
+        check,
+        typedWord: word_ar
+      });
       return;
     }
-    state.currentAddGuess = guess;
+    if (check.collision) {
+      ensureStemJob({ typed: word_ar, stems: check.stems, seed: attachStems(guess, check), taken: check.taken || [], takenEntries: check.takenEntries });
+      renderStemCollision(check, guess);
+      return;
+    }
+    state.currentAddGuess = rememberCurrentStem(attachStems(guess, check));
     renderAddStepConfirm();
   } catch (err) {
     if (!adding) return;
@@ -244,19 +778,59 @@ function fillItem(item) {
   const seq = ++item.seq;
   item.promise = (async () => {
     try {
-      const { existing } = await api("/api/duplicate", {
+      const check = await api("/api/duplicate", {
         method: "POST",
         body: JSON.stringify({ word_ar: item.typed })
       });
       if (item.seq !== seq || !batch) return;
-      if (existing) {
-        const dated = await applyBatchLearnedDate(existing);
+      if (check.stems?.family === "I-II-IV") {
+        ensureStemJob({ typed: item.typed, stems: check.stems, taken: check.taken || [], takenEntries: check.takenEntries });
+      }
+      if (check.existing) {
+        const dated = await applyBatchLearnedDate(check.existing);
         if (item.seq !== seq || !batch) return;
+        if (check.otherStems?.length && check.stems?.family === "I-II-IV") {
+          const job = ensureStemJob({ typed: item.typed, stems: check.stems, taken: check.taken || [], takenEntries: check.takenEntries });
+          await waitAllStems(job);
+          if (item.seq !== seq || !batch) return;
+          const form = defaultNewStem(check, job);
+          if (!form) {
+            item.existing = dated;
+            return;
+          }
+          item.guess = buildGuessFromJob(job, form, { date_learned: batch?.dateLearned || "" });
+          item.stemResolved = true;
+          return;
+        }
         item.existing = dated;
         return;
       }
+      if (check.collision && check.stems?.family === "I-II-IV") {
+        const job = ensureStemJob({ typed: item.typed, stems: check.stems, taken: check.taken || check.collision.taken || [], takenEntries: check.takenEntries });
+        await waitAllStems(job);
+        if (item.seq !== seq || !batch) return;
+        const form = defaultNewStem(check, job);
+        if (!form) {
+          const dated = await applyBatchLearnedDate(check.collision.existing);
+          if (item.seq !== seq || !batch) return;
+          item.existing = dated;
+          return;
+        }
+        item.guess = buildGuessFromJob(job, form, { date_learned: batch?.dateLearned || "" });
+        item.stemResolved = true;
+        return;
+      }
+      if (check.stems?.family === "I-II-IV") {
+        const job = ensureStemJob({ typed: item.typed, stems: check.stems, taken: check.taken || [], takenEntries: check.takenEntries });
+        await waitAllStems(job);
+        if (item.seq !== seq || !batch) return;
+        item.guess = buildGuessFromJob(job, preferredStemForm(check.stems), {
+          date_learned: batch?.dateLearned || ""
+        }) || rememberCurrentStem(attachStems(emptyGuess(item.typed, batch?.dateLearned || ""), check));
+        return;
+      }
       if (!state.config.hasApiKey) {
-        item.guess = emptyGuess(item.typed, batch?.dateLearned || "");
+        item.guess = rememberCurrentStem(attachStems(emptyGuess(item.typed, batch?.dateLearned || ""), check));
         return;
       }
       const guess = await api("/api/autofill", {
@@ -272,10 +846,36 @@ function fillItem(item) {
       if (after.existing) {
         const dated = await applyBatchLearnedDate(after.existing);
         if (item.seq !== seq || !batch) return;
+        if (after.otherStems?.length && after.stems?.family === "I-II-IV") {
+          const job = ensureStemJob({ typed: item.typed, stems: after.stems, taken: after.taken || [], takenEntries: after.takenEntries });
+          await waitAllStems(job);
+          if (item.seq !== seq || !batch) return;
+          const form = defaultNewStem(after, job);
+          if (!form) {
+            item.existing = dated;
+            return;
+          }
+          item.guess = buildGuessFromJob(job, form, { date_learned: batch?.dateLearned || "" });
+          item.stemResolved = true;
+          return;
+        }
         item.existing = dated;
         return;
       }
-      item.guess = { ...guess, notes: "", date_learned: batch?.dateLearned || "" };
+      if (after.collision && after.stems?.family === "I-II-IV") {
+        const job = ensureStemJob({ typed: item.typed, stems: after.stems, taken: after.taken || after.collision.taken || [], takenEntries: after.takenEntries });
+        await waitAllStems(job);
+        if (item.seq !== seq || !batch) return;
+        const form = defaultNewStem(after, job);
+        if (!form) {
+          item.guess = rememberCurrentStem(attachStems({ ...guess, notes: "", date_learned: batch?.dateLearned || "" }, after));
+          return;
+        }
+        item.guess = buildGuessFromJob(job, form, { date_learned: batch?.dateLearned || "" });
+        item.stemResolved = true;
+        return;
+      }
+      item.guess = rememberCurrentStem(attachStems({ ...guess, notes: "", date_learned: batch?.dateLearned || "" }, after));
     } catch {
       if (item.seq !== seq || !batch) return;
       item.guess = emptyGuess(item.typed, batch?.dateLearned || "");
@@ -305,6 +905,25 @@ async function showCurrentDeckItem() {
   if (item.existing) {
     takeDuplicate(item.existing, item);
     return showCurrentDeckItem();
+  }
+  if (item.collisionCheck && !item.stemResolved) {
+    const check = item.collisionCheck;
+    const job = ensureStemJob({
+      typed: item.typed,
+      stems: check.stems,
+      taken: check.taken || check.collision?.taken || [],
+      takenEntries: check.takenEntries
+    });
+    const form = defaultNewStem(check, job);
+    if (form) {
+      state.currentAddWord = item.typed;
+      state.currentAddGuess = item.guess;
+      renderDeck();
+      await showStemForm(form, { typed: item.typed, guess: item.guess, stems: check.stems });
+      return;
+    }
+    renderStemCollision(check, item.guess || emptyGuess(item.typed));
+    return;
   }
   state.currentAddWord = item.typed;
   state.currentAddGuess = item.guess;
@@ -609,7 +1228,9 @@ async function cancelSingleAdd() {
 async function rerollCurrentToBack({ note, existing }) {
   const item = currentBatchItem();
   if (!item || !note || batchAnimating || !deckCanCycle()) return;
-  const existingGuess = { ...(existing || item.guess) };
+  const existingGuess = { ...(existing || item.guess), stemVersions: (existing || item.guess)?.stemVersions || item.guess?.stemVersions };
+  const form = currentStemForm(existingGuess);
+  const versions = existingGuess.stemVersions;
   item.seq += 1;
   const seq = item.seq;
   item.loading = true;
@@ -621,15 +1242,22 @@ async function rerollCurrentToBack({ note, existing }) {
         body: JSON.stringify({
           word_ar: existingGuess.word_ar || item.typed,
           note,
-          existing: stripRegenMeta(existingGuess)
+          existing: stripAutofillExisting(existingGuess)
         })
       });
       if (item.seq !== seq || !batch) return;
-      item.guess = attachRegenMeta({
+      const filled = attachRegenMeta({
         ...guess,
         notes: existingGuess.notes || "",
-        date_learned: existingGuess.date_learned || batch.dateLearned || ""
+        date_learned: existingGuess.date_learned || batch.dateLearned || "",
+        stemForm: form,
+        allowNewStem: existingGuess.allowNewStem
       }, note, { kind: "full" });
+      item.guess = storeStemVersion(
+        rememberCurrentStem(attachStems({ ...existingGuess, stemVersions: versions }, { stems: existingGuess.stems })),
+        form,
+        attachStems(filled, { stems: existingGuess.stems })
+      );
     } catch (err) {
       if (item.seq !== seq) return;
       item.guess = existingGuess;
@@ -705,89 +1333,98 @@ function posOptions(selected) {
 }
 
 function entryFormHtml(g, { isBatch = false } = {}) {
+  const locked = isTakenStem(g);
+  const ro = locked ? " readonly tabindex=\"-1\"" : "";
+  const dis = locked ? " disabled" : "";
   return `
-    <div class="entry-form">
-      <p class="entry-kicker">Confirm entry</p>
+    <div class="entry-form${locked ? " is-existing" : ""}">
+      <p class="entry-kicker">${locked ? "Already in the notebook" : "Confirm entry"}</p>
       <div class="entry-grid">
         <div class="entry-col">
           <div class="entry-field entry-word" data-field-row="word_ar">
-            <div class="entry-label"><label>Word</label>${retryBtn("word_ar")}</div>
-            <input data-field="word_ar" dir="rtl" value="${escapeHtml(g.word_ar)}" />
+            <div class="entry-label"><label>Word</label>${locked ? "" : retryBtn("word_ar")}</div>
+            <input data-field="word_ar" dir="rtl" value="${escapeHtml(g.word_ar)}"${ro} />
+            ${stemSwitchHtml(g)}
           </div>
           <div class="entry-split">
             <div class="entry-field" data-field-row="root">
-              <div class="entry-label"><label>Root</label>${retryBtn("root")}</div>
-              <input data-field="root" dir="rtl" value="${escapeHtml(g.root)}" />
+              <div class="entry-label"><label>Root</label>${locked ? "" : retryBtn("root")}</div>
+              <input data-field="root" dir="rtl" value="${escapeHtml(g.root)}"${ro} />
             </div>
             <div class="entry-field" data-field-row="part_of_speech">
-              <div class="entry-label"><label>Part of speech</label>${retryBtn("part_of_speech")}</div>
-              <select data-field="part_of_speech" class="entry-pos" dir="rtl">
+              <div class="entry-label"><label>Part of speech</label>${locked ? "" : retryBtn("part_of_speech")}</div>
+              <select data-field="part_of_speech" class="entry-pos" dir="rtl"${dis}>
                 <option value="">—</option>
                 ${posOptions(g.part_of_speech)}
               </select>
             </div>
           </div>
           <div class="entry-field" data-field-row="word_ar_paired">
-            <div class="entry-label"><label>Other forms</label>${retryBtn("word_ar_paired")}</div>
-            <div class="paired-form-list" data-paired-list>${(g.word_ar_paired || []).map((r) => `
-              <div class="paired-form-row">
-                <input data-ap-word dir="rtl" value="${escapeHtml(r.word_ar)}" placeholder="الصيغة" />
-                <input data-ap-label dir="rtl" value="${escapeHtml(r.label)}" placeholder="ماضٍ" />
-                <button class="icon-btn" type="button">✕</button>
-              </div>
-            `).join("")}</div>
-            <button class="entry-add-form" data-add-paired type="button">+ Add form</button>
+            <div class="entry-label"><label>Other forms</label>${locked ? "" : retryBtn("word_ar_paired")}</div>
+            <div class="paired-form-list" data-paired-list></div>
+            ${locked ? "" : `<button class="entry-add-form" data-add-paired type="button">+ Add form</button>`}
           </div>
         </div>
         <div class="entry-col">
           <div class="entry-field entry-meaning" data-field-row="meaning">
-            <div class="entry-label"><label>Meaning</label>${retryBtn("meaning")}</div>
-            <textarea data-field="meaning">${escapeHtml(g.meaning)}</textarea>
+            <div class="entry-label"><label>Meaning</label>${locked ? "" : retryBtn("meaning")}</div>
+            <textarea data-field="meaning"${ro}>${escapeHtml(g.meaning)}</textarea>
           </div>
           <div class="entry-field entry-notes">
             <div class="entry-label"><label>Notes</label></div>
-            <textarea data-field="notes">${escapeHtml(g.notes || "")}</textarea>
+            <textarea data-field="notes"${ro}>${escapeHtml(g.notes || "")}</textarea>
           </div>
           <div class="entry-field entry-date">
             <div class="entry-label"><label>Date learned</label></div>
-            <input data-field="date_learned" type="date" value="${escapeHtml(dateInputValue(g.date_learned))}" />
+            <input data-field="date_learned" type="date" value="${escapeHtml(dateInputValue(g.date_learned))}"${ro}${dis} />
           </div>
         </div>
       </div>
       <div class="entry-actions">
         <div class="entry-actions-start">
           <button class="btn secondary" data-cancel-add type="button">${isBatch ? "Skip" : "Cancel"}</button>
-          ${regenExpandHtml()}
+          ${locked ? "" : regenExpandHtml()}
         </div>
-        <button class="btn primary" data-commit-add type="button">Add</button>
+        ${locked
+          ? (!isBatch && g.existingId ? `<button class="btn primary" data-open-existing type="button">Open</button>` : "<span></span>")
+          : `<button class="btn primary" data-commit-add type="button">Add</button>`}
       </div>
     </div>
   `;
 }
 
 function bindEntryForm(root) {
-  bindRegenExpand(root, {
-    getExisting() {
-      syncGuessFromForm();
-      return stripRegenMeta(state.currentAddGuess);
-    },
-    applyGuess(guess) {
-      state.currentAddGuess = { ...guess, notes: state.currentAddGuess?.notes, date_learned: state.currentAddGuess?.date_learned };
-      if (isBatch() && currentBatchItem()) currentBatchItem().guess = state.currentAddGuess;
-      writeGuessFields(state.currentAddGuess);
-      mountRegenAside($(".deck-layout"), state.currentAddGuess);
-    },
-    stillActive: () => adding,
-    startRegen: deckCanCycle() ? rerollCurrentToBack : undefined
-  });
+  if (!isTakenStem(state.currentAddGuess)) {
+    bindRegenExpand(root, {
+      getExisting() {
+        syncGuessFromForm();
+        return state.currentAddGuess;
+      },
+      applyGuess(guess) {
+        const prev = state.currentAddGuess;
+        setCurrentGuess(rememberCurrentStem(attachStems({
+          ...guess,
+          notes: prev?.notes,
+          date_learned: prev?.date_learned,
+          stemVersions: prev?.stemVersions,
+          allowNewStem: prev?.allowNewStem,
+          stemForm: prev?.stemForm,
+          takenStems: prev?.takenStems
+        }, { stems: prev?.stems })));
+        paintCurrentGuess();
+      },
+      stillActive: () => adding,
+      startRegen: deckCanCycle() ? rerollCurrentToBack : undefined
+    });
+  }
 
   const g = state.currentAddGuess;
-  if (g) renderAddPairedRows(g.word_ar_paired || [], root);
+  if (g) renderAddPairedRows(g.word_ar_paired || [], root, isTakenStem(g));
 
   $("[data-add-paired]", root)?.addEventListener("click", () => {
     const rows = getAddPairedRows(root);
     rows.push({ label: "", word_ar: "" });
-    renderAddPairedRows(rows, root);
+    renderAddPairedRows(rows, root, false);
   });
 
   $$("[data-retry-field]", root).forEach((btn) => {
@@ -795,6 +1432,11 @@ function bindEntryForm(root) {
   });
 
   $("[data-commit-add]", root)?.addEventListener("click", commitCurrentWord);
+  $("[data-open-existing]", root)?.addEventListener("click", () => {
+    const entry = { id: state.currentAddGuess?.existingId, word_ar: state.currentAddGuess?.word_ar };
+    if (entry.id) openExistingWord(entry);
+  });
+  bindStemSwitch(root);
 }
 
 function renderAddStepConfirm({ keepRegen = true } = {}) {
@@ -862,7 +1504,7 @@ function summarySection({ entries, stamp, variant, delay = 0 }) {
   `;
 }
 
-function renderResultSummary({ added = [], duplicates = [] } = {}) {
+function renderResultSummary({ added = [], duplicates = [], check = null, typedWord = "" } = {}) {
   const addedList = uniqEntries(added);
   const addedIds = new Set(addedList.map((e) => e.id));
   const dupList = uniqEntries(duplicates).filter((e) => !addedIds.has(e.id));
@@ -870,16 +1512,28 @@ function renderResultSummary({ added = [], duplicates = [] } = {}) {
     abortAdd();
     return;
   }
+  const showOtherStems = !addedList.length && dupList.length === 1 && check?.otherStems?.length;
+  if (showOtherStems) {
+    ensureStemJob({
+      typed: typedWord || state.currentAddWord,
+      stems: check.stems,
+      seed: state.currentAddGuess,
+      taken: check.taken || [],
+      takenEntries: check.takenEntries
+    });
+  }
   $("#addModal").classList.remove("hidden");
   setAddModalKind("dup");
   const addedDelay = 0;
   const dupDelay = addedList.length ? 0.12 + addedList.length * 0.05 : 0;
   $("#addModalBody").innerHTML = `
-    <div class="dup-notice">
+    <div class="dup-notice${showOtherStems ? " collision-notice" : ""}">
       ${summarySection({ entries: addedList, stamp: "أُضيفت", variant: "added", delay: addedDelay })}
       ${summarySection({ entries: dupList, stamp: "في الدفتر", variant: "dup", delay: dupDelay })}
       <div class="entry-actions">
-        <span></span>
+        ${showOtherStems
+          ? `<button class="btn secondary" data-open-other-stem type="button">Or another Form</button>`
+          : "<span></span>"}
         <button class="btn primary" id="dupContinueBtn" type="button">Done</button>
       </div>
     </div>
@@ -891,14 +1545,36 @@ function renderResultSummary({ added = [], duplicates = [] } = {}) {
       if (entry) openExistingWord(entry);
     });
   });
+  $("[data-open-other-stem]")?.addEventListener("click", () => {
+    const job = ensureStemJob({
+      typed: typedWord || state.currentAddWord,
+      stems: check.stems,
+      seed: state.currentAddGuess,
+      taken: check.taken || [],
+      takenEntries: check.takenEntries
+    });
+    const form = defaultNewStem(check, job);
+    if (!form) return;
+    chooseStemForm(form, {
+      typed: typedWord || state.currentAddWord,
+      guess: state.currentAddGuess,
+      stems: check.stems
+    });
+  });
   $("#dupContinueBtn").addEventListener("click", abortAdd);
 }
 
 async function commitCurrentWord() {
+  if (isTakenStem(state.currentAddGuess)) return;
   if (batchAnimating) return;
   batchAnimating = true;
   syncGuessFromForm();
-  const payload = stripRegenMeta({ ...state.currentAddGuess, word_ar_paired: getAddPairedRows().filter((r) => r.word_ar.trim()) });
+  saveGuessToJob(state.currentAddGuess);
+  const payload = stripAutofillExisting({
+    ...state.currentAddGuess,
+    word_ar_paired: getAddPairedRows().filter((r) => r.word_ar.trim()),
+    allowNewStem: !!state.currentAddGuess.allowNewStem
+  });
   try {
     const saved = await api("/api/words", { method: "POST", body: JSON.stringify(payload) });
     noteWordAdded();
@@ -916,6 +1592,10 @@ async function commitCurrentWord() {
     batch.items.splice(0, 1);
     await afterDeckChange();
   } catch (err) {
+    if (err.status === 409 && err.body?.error === "STEM_COLLISION" && err.body?.collision) {
+      renderStemCollision(err.body, state.currentAddGuess);
+      return;
+    }
     if (err.status === 409 && err.body?.existing) {
       if (isBatch()) {
         await dismissTop("skip");
@@ -925,7 +1605,11 @@ async function commitCurrentWord() {
         await afterDeckChange();
         return;
       }
-      renderResultSummary({ duplicates: [err.body.existing] });
+      renderResultSummary({
+        duplicates: [err.body.existing],
+        check: err.body,
+        typedWord: state.currentAddWord
+      });
       return;
     }
     alert(err.message || "Could not save");
@@ -953,7 +1637,7 @@ function writeGuessFields(g, root = formRoot()) {
   renderAddPairedRows(g.word_ar_paired || [], root);
 }
 
-function renderAddPairedRows(rows, root = formRoot()) {
+function renderAddPairedRows(rows, root = formRoot(), locked = isTakenStem(state.currentAddGuess)) {
   const container = $("[data-paired-list]", root);
   if (!container) return;
   container.innerHTML = "";
@@ -961,17 +1645,18 @@ function renderAddPairedRows(rows, root = formRoot()) {
     const row = document.createElement("div");
     row.className = "paired-form-row";
     row.innerHTML = `
-      <input data-ap-word dir="rtl" value="${escapeHtml(r.word_ar)}" placeholder="الصيغة" />
-      <input data-ap-label dir="rtl" value="${escapeHtml(r.label)}" placeholder="ماضٍ" />
-      <button class="icon-btn" data-remove-ap="${i}" type="button">✕</button>
+      <input data-ap-word dir="rtl" value="${escapeHtml(r.word_ar)}" placeholder="الصيغة"${locked ? " readonly tabindex=\"-1\"" : ""} />
+      <input data-ap-label dir="rtl" value="${escapeHtml(r.label)}" placeholder="ماضٍ"${locked ? " readonly tabindex=\"-1\"" : ""} />
+      ${locked ? "" : `<button class="icon-btn" data-remove-ap="${i}" type="button">✕</button>`}
     `;
     container.appendChild(row);
   });
+  if (locked) return;
   $$(`[data-remove-ap]`, container).forEach((btn) => {
     btn.addEventListener("click", () => {
       const idx = parseInt(btn.dataset.removeAp);
       rows.splice(idx, 1);
-      renderAddPairedRows(rows, root);
+      renderAddPairedRows(rows, root, false);
     });
   });
 }
@@ -998,6 +1683,7 @@ function syncGuessFromForm() {
 }
 
 async function retryField(field) {
+  if (isTakenStem(state.currentAddGuess)) return;
   const root = formRoot();
   const btn = $(`[data-retry-field="${field}"]`, root);
   if (!btn || btn.disabled || btn.classList.contains("is-spinning")) return;
@@ -1007,13 +1693,11 @@ async function retryField(field) {
   try {
     const result = await api("/api/autofill/field", {
       method: "POST",
-      body: JSON.stringify({ field, word_ar: state.currentAddGuess.word_ar, existing: stripRegenMeta(state.currentAddGuess) })
+      body: JSON.stringify({ field, word_ar: state.currentAddGuess.word_ar, existing: stripAutofillExisting(state.currentAddGuess) })
     });
     if (!adding) return;
-    state.currentAddGuess = attachFieldRegen(state.currentAddGuess, result, field);
-    if (isBatch() && currentBatchItem()) currentBatchItem().guess = state.currentAddGuess;
-    writeGuessFields(state.currentAddGuess);
-    mountRegenAside($(".deck-layout"), state.currentAddGuess);
+    setCurrentGuess(rememberCurrentStem(attachFieldRegen(state.currentAddGuess, result, field)));
+    paintCurrentGuess();
     btn.classList.remove("is-spinning");
     btn.disabled = false;
   } catch (err) {

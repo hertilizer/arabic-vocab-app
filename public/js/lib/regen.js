@@ -9,6 +9,12 @@ export function stripRegenMeta(guess) {
   return rest;
 }
 
+export function stripAutofillExisting(guess) {
+  if (!guess) return guess;
+  const { stemVersions, stems, takenStems, ...rest } = stripRegenMeta(guess);
+  return rest;
+}
+
 export function attachRegenMeta(guess, note, extra = {}) {
   const next = { ...stripRegenMeta(guess) };
   const n = String(note || "").trim();
@@ -176,7 +182,7 @@ export function bindRegenExpand(root, { getExisting, applyGuess, stillActive, st
     try {
       const guess = await api("/api/autofill", {
         method: "POST",
-        body: JSON.stringify({ word_ar: existing.word_ar, note, existing: stripRegenMeta(existing) })
+        body: JSON.stringify({ word_ar: existing.word_ar, note, existing: stripAutofillExisting(existing) })
       });
       if (stillActive && !stillActive()) return;
       applyGuess(attachRegenMeta(guess, note, { kind: "full" }));

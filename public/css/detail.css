@@ -9,6 +9,17 @@
 .modal-overlay.hidden { display: none; }
 #editModal,
 #addModal { z-index: 110; }
+#cardModal.from-add {
+  z-index: 120;
+  background: transparent;
+}
+#cardModal.from-add .flip-scene {
+  animation: card-from-add 0.42s cubic-bezier(0.22, 0.8, 0.36, 1);
+}
+@keyframes card-from-add {
+  from { opacity: 0; transform: translateX(28%) rotate(8deg); }
+  to { opacity: 1; transform: none; }
+}
 .modal {
   background: var(--surface);
   border: 1px solid var(--border);

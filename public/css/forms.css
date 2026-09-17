@@ -366,6 +366,9 @@
   align-items: center;
   min-height: 460px;
 }
+.dup-notice.collision-notice {
+  min-height: 0;
+}
 .dup-section {
   display: flex;
   flex-direction: column;
@@ -373,6 +376,10 @@
   flex: 1;
   width: 100%;
   min-height: 0;
+}
+.dup-notice.collision-notice .dup-section,
+.dup-notice.collision-notice .dup-grid {
+  flex: 0 0 auto;
 }
 .dup-section + .dup-section {
   margin-top: 8px;
@@ -457,6 +464,115 @@
 .dup-notice .entry-actions {
   width: 100%;
 }
+
+.stem-switch {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.stem-switch-btn {
+  position: relative;
+  flex: 1;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: 10px;
+  padding: 10px 6px 10px;
+  cursor: pointer;
+  font: inherit;
+}
+.stem-switch-btn.is-active {
+  border-color: var(--accent);
+  color: var(--text);
+}
+.stem-switch-form {
+  display: block;
+  text-align: center;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.stem-switch-taken {
+  position: absolute;
+  top: 5px;
+  right: 6px;
+  display: inline-flex;
+  color: var(--accent-2);
+}
+.stem-switch-taken svg {
+  display: block;
+  width: 12px;
+  height: 12px;
+}
+.stem-switch-btn.is-taken:not(.is-active) {
+  opacity: 0.85;
+}
+.entry-form.is-existing [data-field],
+.entry-form.is-existing [data-ap-word],
+.entry-form.is-existing [data-ap-label] {
+  opacity: 0.85;
+  cursor: default;
+}
+.stem-switch-word {
+  display: block;
+  margin-top: 4px;
+  font-family: 'Noto Naskh Arabic', serif;
+  font-size: 1.05rem;
+  line-height: 1.3;
+}
+.collision-kicker {
+  margin: 8px 0 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.dup-notice > .dup-section + .collision-copy {
+  margin-top: 16px;
+}
+.collision-copy {
+  max-width: 28rem;
+  margin: 12px 24px 8px;
+  text-align: center;
+  color: var(--text-dim);
+  line-height: 1.45;
+}
+.stem-choices {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin: 18px 0 8px;
+}
+.stem-choice {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 12px;
+  padding: 10px 16px;
+  cursor: pointer;
+  font: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 140px;
+}
+.stem-choice-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.stem-choice-word {
+  font-family: 'Noto Naskh Arabic', serif;
+  font-size: 1.55rem;
+  line-height: 1.3;
+  color: var(--text);
+}
+.stem-choice:hover { border-color: var(--accent); }
 
 @keyframes dup-word-in {
   from { transform: translateY(10px); opacity: 0; }
