@@ -2,11 +2,12 @@ import { $ } from "./lib/dom.js";
 import { api } from "./lib/api.js";
 import { state } from "./lib/state.js";
 import { initHarakat } from "./lib/harakat.js";
-import { initHome, loadHome } from "./home.js";
-import { initDetail, openCardDetail } from "./detail.js";
-import { initEdit } from "./edit.js";
-import { initAdd } from "./add.js";
+import { initHome, applyHomeNav } from "./home.js";
+import { initDetail, openCardDetail, applyDetailNav } from "./detail.js";
+import { initEdit, applyEditNav } from "./edit.js";
+import { initAdd, applyAddNav } from "./add.js";
 import { initExport } from "./export.js";
+import { initNav, parseLocation, navigate } from "./lib/nav.js";
 
 function initShemaghParallax() {
   const SHEMAGH_PARALLAX = 0.4;
@@ -27,6 +28,13 @@ function initShemaghParallax() {
   updateShemaghParallax();
 }
 
+function applyNav(nav) {
+  applyHomeNav(nav);
+  applyAddNav(nav);
+  applyDetailNav(nav);
+  applyEditNav(nav);
+}
+
 async function init() {
   state.config = await api("/api/config");
   initHarakat();
@@ -36,7 +44,9 @@ async function init() {
   initAdd();
   initExport();
   initShemaghParallax();
-  loadHome();
+  initNav(applyNav);
+  const initial = parseLocation();
+  navigate(initial, { replace: true });
 }
 
 init();

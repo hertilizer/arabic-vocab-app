@@ -2,8 +2,10 @@ import { $, $$, escapeHtml, addedAgo, entryDisplayDate } from "./lib/dom.js";
 import { api } from "./lib/api.js";
 import { stripHarakat } from "./lib/harakat.js";
 import { ICONS } from "./lib/icons.js";
+import { navigate, read } from "./lib/nav.js";
 
 let openCardDetail = async () => {};
+let appliedBase = "";
 
 export function showView(id) {
   $$(".view").forEach((v) => v.classList.add("hidden"));
@@ -41,7 +43,12 @@ function renderStats({ words = 0, roots = 0 } = {}) {
   set("roots", roots);
 }
 
-export async function loadHome() {
+export async function loadHome({ fromNav = false } = {}) {
+  if (!fromNav) {
+    navigate({ view: "home", q: null, root: null, card: null, edit: null, review: null }, { replace: true });
+    return;
+  }
+  appliedBase = "home";
   showView("homeView");
   const [randomWords, recentWords, stats] = await Promise.all([
     api("/api/random?count=3"),
@@ -53,7 +60,15 @@ export async function loadHome() {
   renderStats(stats);
 }
 
-export async function showRootCluster(root) {
+export async function showRootCluster(root, { fromNav = false } = {}) {
+  if (!fromNav) {
+    navigate(
+      { view: "root", root, q: null, card: null, edit: null, review: null },
+      { replace: !!read().card }
+    );
+    return;
+  }
+  appliedBase = `root:${root}`;
   showView("resultsView");
   const title = $("#resultsTitle");
   title.textContent = `Root: ${root}`;
@@ -62,11 +77,18 @@ export async function showRootCluster(root) {
   renderGrid($("#resultsGrid"), entries);
 }
 
-async function runSearch(q) {
+async function runSearch(q, { fromNav = false } = {}) {
   if (!q.trim()) {
-    loadHome();
+    await loadHome({ fromNav });
     return;
   }
+  if (!fromNav) {
+    navigate(
+      { view: "search", q, root: null, card: null, edit: null },
+      { replace: read().view === "search", silent: true }
+    );
+  }
+  appliedBase = `search:${q}`;
   showView("resultsView");
   $("#resultsTitle").classList.add("hidden");
   const entries = await api(`/api/search?q=${encodeURIComponent(q)}`);
@@ -77,6 +99,35 @@ async function runSearch(q) {
       <p class="empty-state-hint">Nothing in the notebook matches this search.</p>
     </div>
   `);
+}
+
+export function applyHomeNav(nav) {
+  const base = nav.view === "search" ? `search:${nav.q || ""}` : nav.view === "root" ? `root:${nav.root || ""}` : "home";
+  if (base === appliedBase) {
+    syncSearchChrome(nav);
+    return;
+  }
+  if (nav.view === "search") {
+    syncSearchChrome(nav);
+    runSearch(nav.q, { fromNav: true });
+    return;
+  }
+  collapseSearch({ clear: nav.view !== "search" });
+  if (nav.view === "root") showRootCluster(nav.root, { fromNav: true });
+  else loadHome({ fromNav: true });
+}
+
+function syncSearchChrome(nav) {
+  const input = $("#searchInput");
+  const wrap = $("#searchExpand");
+  if (!input || !wrap) return;
+  if (nav.view === "search") {
+    if (input.value !== (nav.q || "")) input.value = nav.q || "";
+    wrap.classList.add("is-open");
+    wrap.classList.toggle("has-query", !!String(nav.q || "").trim());
+    $("#searchToggle")?.setAttribute("aria-expanded", "true");
+    input.tabIndex = 0;
+  }
 }
 
 let collapseSearch = () => {};

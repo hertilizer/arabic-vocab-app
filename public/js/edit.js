@@ -5,6 +5,7 @@ import { loadHome } from "./home.js";
 import { openCardDetail, closeCardModal } from "./detail.js";
 import { regenExpandHtml, currentRegenNote, isRegenOpen, setRegenOpen, bindRegenExpand, collapseRegenOnPointerDown, stripRegenMeta, attachFieldRegen, mountRegenAside } from "./lib/regen.js";
 import { ICONS, quietIconBtn } from "./lib/icons.js";
+import { navigate, read, navBack } from "./lib/nav.js";
 
 let editingId = null;
 
@@ -12,11 +13,12 @@ function posOptions(selected) {
   return state.config.posList.map((p) => `<option value="${escapeHtml(p)}" ${p === selected ? "selected" : ""}>${escapeHtml(p)}</option>`).join("");
 }
 
-export async function openEditModal(entryOrId) {
+export async function openEditModal(entryOrId, { fromNav = false } = {}) {
   const entry = typeof entryOrId === "object" ? entryOrId : await api(`/api/words/${entryOrId}`);
   editingId = entry.id;
   renderEditForm(entry, { keepRegen: false });
   $("#editModal").classList.remove("hidden");
+  if (!fromNav) navigate({ card: entry.id, edit: true }, { silent: true });
 }
 
 function renderEditForm(entry, { keepRegen = true } = {}) {
@@ -115,7 +117,7 @@ function renderEditForm(entry, { keepRegen = true } = {}) {
     try {
       await api(`/api/words/${entry.id}`, { method: "DELETE" });
       closeEditModal();
-      closeCardModal();
+      closeCardModal({ fromNav: true });
       loadHome();
     } catch (err) {
       alert(err.message || "Could not delete");
@@ -126,8 +128,9 @@ function renderEditForm(entry, { keepRegen = true } = {}) {
     try {
       await api(`/api/words/${entry.id}`, { method: "PUT", body: JSON.stringify(getEditPayload()) });
       closeEditModal();
-      loadHome();
-      await openCardDetail(entry.id, { saved: true });
+      await loadHome({ fromNav: true });
+      await openCardDetail(entry.id, { saved: true, fromNav: true });
+      navigate({ card: entry.id, edit: null }, { replace: true, silent: true });
     } catch (err) {
       alert(err.message || "Could not save");
     }
@@ -193,7 +196,17 @@ function closeEditModal() {
 }
 
 function dismissEdit() {
-  closeEditModal();
+  if (read().edit) navBack();
+  else closeEditModal();
+}
+
+export function applyEditNav(nav) {
+  if (nav.edit && nav.card) {
+    if (editingId != null && String(editingId) === String(nav.card) && !$("#editModal").classList.contains("hidden")) return;
+    openEditModal(nav.card, { fromNav: true });
+    return;
+  }
+  if (!$("#editModal").classList.contains("hidden")) closeEditModal();
 }
 
 function renderPairedEditRows(rows) {

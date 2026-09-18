@@ -7,11 +7,13 @@ import { regenExpandHtml, currentRegenNote, isRegenOpen, bindRegenExpand, collap
 import { loadHome } from "./home.js";
 import { openCardDetail } from "./detail.js";
 import { noteWordAdded } from "./export.js";
+import { navigate, read, navBack } from "./lib/nav.js";
 
 let adding = false;
 let batch = null;
 let batchAnimating = false;
 let deckUid = 0;
+let reviewKeep = false;
 
 function isBatch() {
   return !!batch;
@@ -42,12 +44,22 @@ function abortAdd() {
   adding = false;
   batch = null;
   batchAnimating = false;
+  reviewKeep = false;
   setAddModalKind(null);
   $("#addModal").classList.add("hidden");
 }
 
+function finishReview() {
+  abortAdd();
+  if (read().review) navBack();
+}
+
 function closeAddModal() {
   if (batchAnimating) return;
+  if (reviewKeep) {
+    finishReview();
+    return;
+  }
   if (batch && batch.items.length) {
     if (!confirm("Stop adding this list?")) return;
     abortAdd();
@@ -582,8 +594,11 @@ async function openExistingWord(entry) {
   if (!entry?.id || batchAnimating) return;
   $("#addWordInput").value = "";
   adding = false;
+  const keepReview = reviewKeep;
+  if (!keepReview) batch = null;
+  else $("#addModal").classList.add("hidden");
   const pending = api(`/api/words/${entry.id}`);
-  const flying = $(".deck-card.is-top") ? dismissTop("skip") : Promise.resolve();
+  const flying = (!keepReview && $(".deck-card.is-top")) ? dismissTop("skip") : Promise.resolve();
   let word;
   try {
     word = await pending;
@@ -603,7 +618,7 @@ async function openExistingWord(entry) {
     ]);
   } finally {
     cardModal?.classList.remove("from-add");
-    abortAdd();
+    if (!keepReview) abortAdd();
   }
 }
 
@@ -1556,6 +1571,8 @@ function renderResultSummary({ added = [], duplicates = [], check = null, typedW
   }
   $("#addModal").classList.remove("hidden");
   setAddModalKind("dup");
+  reviewKeep = true;
+  if (!read().review) navigate({ review: true }, { silent: true });
   const addedDelay = 0;
   const dupDelay = addedList.length ? 0.12 + addedList.length * 0.05 : 0;
   $("#addModalBody").innerHTML = `
@@ -1593,7 +1610,7 @@ function renderResultSummary({ added = [], duplicates = [], check = null, typedW
       stems: check.stems
     });
   });
-  $("#dupContinueBtn").addEventListener("click", abortAdd);
+  $("#dupContinueBtn").addEventListener("click", finishReview);
 }
 
 async function commitCurrentWord() {
@@ -1737,6 +1754,18 @@ async function retryField(field) {
     btn.disabled = false;
     alert(err.message || "Something went wrong");
   }
+}
+
+export function applyAddNav(nav) {
+  if (nav.review && nav.card) {
+    $("#addModal").classList.add("hidden");
+    return;
+  }
+  if (nav.review) {
+    if (reviewKeep) $("#addModal").classList.remove("hidden");
+    return;
+  }
+  if (reviewKeep) abortAdd();
 }
 
 export function initAdd() {

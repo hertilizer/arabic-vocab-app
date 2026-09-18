@@ -5,6 +5,7 @@ import { ICONS, harakatBtn, quietIconBtn } from "./lib/icons.js";
 import { arHtml, syncHarakatToggle, resetHarakat } from "./lib/harakat.js";
 import { showRootCluster } from "./home.js";
 import { openEditModal } from "./edit.js";
+import { navigate, read, navBack } from "./lib/nav.js";
 
 const CARD_TAP_MS = 200;
 const CARD_HOLD_MS = 1500;
@@ -187,7 +188,7 @@ async function fetchAndShowExample() {
   }
 }
 
-export async function openCardDetail(id, { saved = false, entry = null } = {}) {
+export async function openCardDetail(id, { saved = false, entry = null, fromNav = false } = {}) {
   const word = entry?.word_ar ? entry : await api(`/api/words/${id}`);
   const body = $("#cardModalBody");
   const notesBlock = word.notes
@@ -226,7 +227,6 @@ export async function openCardDetail(id, { saved = false, entry = null } = {}) {
   `;
 
   $("#detailRootChip")?.addEventListener("click", () => {
-    closeCardModal();
     showRootCluster(word.root);
   });
 
@@ -238,6 +238,10 @@ export async function openCardDetail(id, { saved = false, entry = null } = {}) {
   syncHarakatToggle();
   $("#cardModal").classList.remove("hidden");
   if (saved) flashSaved(addedAgo(entryDisplayDate(word)));
+  if (!fromNav) {
+    const cur = read();
+    if (String(cur.card) !== String(id) || cur.edit) navigate({ card: id, edit: null }, { silent: true });
+  }
 }
 
 function flashSaved(restoreText) {
@@ -252,7 +256,13 @@ function flashSaved(restoreText) {
   }, 1600);
 }
 
-export function closeCardModal() {
+export function closeCardModal({ fromNav = false } = {}) {
+  const shouldBack = !fromNav && !!read().card;
+  hideCardModal();
+  if (shouldBack) navBack();
+}
+
+function hideCardModal() {
   clearHold();
   holdFired = false;
   setExampleBusy(false);
@@ -261,6 +271,15 @@ export function closeCardModal() {
   setCardFace("front");
   $("#cardModal").classList.add("hidden");
   $("#cardModal").classList.remove("from-add");
+}
+
+export function applyDetailNav(nav) {
+  if (!nav.card) {
+    if (!$("#cardModal").classList.contains("hidden")) hideCardModal();
+    return;
+  }
+  if (detailEntry && String(detailEntry.id) === String(nav.card) && !$("#cardModal").classList.contains("hidden")) return;
+  openCardDetail(nav.card, { fromNav: true });
 }
 
 export function initDetail() {
