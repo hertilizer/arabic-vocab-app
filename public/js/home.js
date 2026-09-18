@@ -46,8 +46,9 @@ function renderStats({ words = 0, roots = 0 } = {}) {
 
 export async function loadHome({ fromNav = false } = {}) {
   if (!fromNav) {
+    const alreadyHome = appliedBase === "home";
     navigate({ view: "home", q: null, root: null, card: null, edit: null, review: null }, { replace: true });
-    return;
+    if (!alreadyHome) return;
   }
   appliedBase = "home";
   showView("homeView");
