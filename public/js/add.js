@@ -1365,7 +1365,10 @@ function withCardClose(html) {
 
 function renderSoloCard(innerHtml) {
   setAddModalKind("deck");
-  $("#addModalBody").innerHTML = `<div class="deck-layout"><div class="deck-scene"><div class="deck-card is-top">${withCardClose(innerHtml)}</div></div></div>`;
+  const body = $("#addModalBody");
+  const previousHeight = $(".deck-card.is-top", body)?.getBoundingClientRect().height;
+  const heightStyle = previousHeight ? ` style="--deck-h: ${Math.round(previousHeight)}px"` : "";
+  body.innerHTML = `<div class="deck-layout"${heightStyle}><div class="deck-scene"${heightStyle}><div class="deck-card is-top">${withCardClose(innerHtml)}</div></div></div>`;
   requestAnimationFrame(syncDeckLayout);
 }
 
@@ -1579,7 +1582,8 @@ function bindEntryForm(root) {
         paintCurrentGuess();
       },
       stillActive: () => adding,
-      startRegen: deckCanCycle() ? rerollCurrentToBack : undefined
+      startRegen: isBatch() ? rerollCurrentToBack : undefined,
+      shouldStartRegen: deckCanCycle
     });
   }
 

@@ -204,7 +204,25 @@ export function setRegenOpen(open, root = document) {
   else if (document.activeElement === input) input.blur();
 }
 
-export function bindRegenExpand(root, { getExisting, applyGuess, stillActive, startRegen }) {
+function waitForRegenClose(wrap) {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return Promise.resolve();
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      wrap.removeEventListener("transitionend", onEnd);
+      resolve();
+    };
+    const onEnd = (event) => {
+      if (event.target === wrap && event.propertyName === "width") finish();
+    };
+    wrap.addEventListener("transitionend", onEnd);
+    setTimeout(finish, 380);
+  });
+}
+
+export function bindRegenExpand(root, { getExisting, applyGuess, stillActive, startRegen, shouldStartRegen }) {
   const wrap = $(".regen-expand", root);
   const btn = $("[data-regen-toggle]", root);
   const input = $(".regen-note", root);
@@ -238,28 +256,35 @@ export function bindRegenExpand(root, { getExisting, applyGuess, stillActive, st
     const note = input.value.trim();
     if (!note || btn.classList.contains("is-spinning")) return;
     const existing = getExisting();
-    if (startRegen) {
+    if (startRegen && (!shouldStartRegen || shouldStartRegen())) {
       input.value = "";
       setRegenOpen(false, root);
+      btn.disabled = true;
+      await waitForRegenClose(wrap);
       startRegen({ note, existing });
       return;
     }
     btn.classList.add("is-spinning");
     btn.disabled = true;
+    input.readOnly = true;
     try {
       const guess = await api("/api/autofill", {
         method: "POST",
         body: JSON.stringify({ word_ar: existing.word_ar, note, existing: stripAutofillExisting(existing) })
       });
       if (stillActive && !stillActive()) return;
-      applyGuess(attachRegenMeta(guess, note, { kind: "full" }));
       btn.classList.remove("is-spinning");
       btn.disabled = false;
       setRegenOpen(false, root);
-      if (input) input.value = "";
+      await waitForRegenClose(wrap);
+      if (stillActive && !stillActive()) return;
+      applyGuess(attachRegenMeta(guess, note, { kind: "full" }));
+      input.readOnly = false;
+      input.value = "";
     } catch (err) {
       btn.classList.remove("is-spinning");
       btn.disabled = false;
+      input.readOnly = false;
       alert(err.message || "Something went wrong");
     }
   }
