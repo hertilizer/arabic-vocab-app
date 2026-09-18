@@ -42,6 +42,7 @@ const FIELD_LABELS = {
   root: "Root",
   part_of_speech: "Part of speech",
   meaning: "Meaning",
+  form: "Form",
   word_ar_paired: "Other forms"
 };
 

@@ -4,6 +4,7 @@ import { state } from "./lib/state.js";
 import { ICONS, quietIconBtn } from "./lib/icons.js";
 import { stripHarakat } from "./lib/harakat.js";
 import { regenExpandHtml, currentRegenNote, isRegenOpen, bindRegenExpand, collapseRegenOnPointerDown, stripAutofillExisting, attachRegenMeta, attachFieldRegen, mountRegenAside, adoptRegenAside } from "./lib/regen.js";
+import { formOptions } from "./lib/form.js";
 import { loadHome } from "./home.js";
 import { openCardDetail } from "./detail.js";
 import { noteWordAdded } from "./export.js";
@@ -73,7 +74,7 @@ function closeAddModal() {
 }
 
 function emptyGuess(word_ar, date_learned = "") {
-  return { word_ar, root: "", part_of_speech: "", meaning: "", word_ar_paired: [], notes: "", date_learned };
+  return { word_ar, root: "", part_of_speech: "", form: "", meaning: "", word_ar_paired: [], notes: "", date_learned };
 }
 
 const STEM_AUTOFILL_NOTES = {
@@ -89,7 +90,7 @@ function attachStems(guess, check) {
   const stems = check?.stems || guess.stems;
   if (!stems) return guess;
   const form = STEM_FORMS.includes(guess.stemForm) ? guess.stemForm : (STEM_FORMS.includes(stems.form) ? stems.form : "I");
-  return { ...guess, stems, stemForm: form };
+  return { ...guess, stems, stemForm: form, form };
 }
 
 function currentStemForm(g) {
@@ -183,6 +184,7 @@ function snapshotFromEntry(entry, form, stems) {
     word_ar: entry.word_ar,
     root: entry.root || "",
     part_of_speech: entry.part_of_speech || "",
+    form: entry.form || "",
     meaning: entry.meaning || "",
     notes: entry.notes || "",
     word_ar_paired: (entry.word_ar_paired || []).map((row) => ({ ...row })),
@@ -1403,6 +1405,12 @@ function entryFormHtml(g, { isBatch = false } = {}) {
               <select data-field="part_of_speech" class="entry-pos" dir="rtl"${dis}>
                 <option value="">—</option>
                 ${posOptions(g.part_of_speech)}
+              </select>
+            </div>
+            <div class="entry-field" data-field-row="form">
+              <div class="entry-label"><label>Form</label>${locked ? "" : retryBtn("form")}</div>
+              <select data-field="form" class="entry-form-select"${dis}>
+                ${formOptions(g.form)}
               </select>
             </div>
           </div>

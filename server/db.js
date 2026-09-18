@@ -26,6 +26,9 @@ const wordCols = db.prepare("PRAGMA table_info(words)").all().map((c) => c.name)
 if (!wordCols.includes("date_learned")) {
   db.exec(`ALTER TABLE words ADD COLUMN date_learned TEXT NOT NULL DEFAULT ''`);
 }
+if (!wordCols.includes("form")) {
+  db.exec(`ALTER TABLE words ADD COLUMN form TEXT`);
+}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS daily_picks (
@@ -77,7 +80,8 @@ function rowToEntry(row) {
     meaning: row.meaning,
     notes: row.notes,
     date_added: row.date_added,
-    date_learned: row.date_learned || ""
+    date_learned: row.date_learned || "",
+    form: row.form == null ? null : String(row.form)
   };
 }
 

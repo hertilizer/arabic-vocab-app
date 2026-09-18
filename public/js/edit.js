@@ -5,6 +5,7 @@ import { loadHome } from "./home.js";
 import { openCardDetail, closeCardModal } from "./detail.js";
 import { regenExpandHtml, currentRegenNote, isRegenOpen, setRegenOpen, bindRegenExpand, collapseRegenOnPointerDown, stripRegenMeta, attachFieldRegen, mountRegenAside } from "./lib/regen.js";
 import { ICONS, quietIconBtn } from "./lib/icons.js";
+import { formOptions } from "./lib/form.js";
 import { navigate, read, navBack } from "./lib/nav.js";
 
 let editingId = null;
@@ -47,6 +48,12 @@ function renderEditForm(entry, { keepRegen = true } = {}) {
               <select id="editPos" class="entry-pos" dir="rtl">
                 <option value="">—</option>
                 ${posOptions(entry.part_of_speech)}
+              </select>
+            </div>
+            <div class="entry-field">
+              <div class="entry-label"><label>Form</label>${retryBtn("form")}</div>
+              <select id="editForm" class="entry-form-select">
+                ${formOptions(entry.form)}
               </select>
             </div>
           </div>
@@ -172,6 +179,7 @@ function getEditPayload() {
     word_ar: $("#editWordAr").value.trim(),
     root: $("#editRoot").value.trim(),
     part_of_speech: $("#editPos").value,
+    form: $("#editForm")?.value || "",
     meaning: $("#editMeaning").value.trim(),
     notes: $("#editNotes").value.trim(),
     date_learned: $("#editDateLearned").value.trim(),
@@ -183,6 +191,7 @@ function writeEditFields(guess, { keepAside = false } = {}) {
   $("#editWordAr").value = guess.word_ar || "";
   $("#editRoot").value = guess.root || "";
   $("#editPos").value = guess.part_of_speech || "";
+  if ($("#editForm")) $("#editForm").value = guess.form || "";
   $("#editMeaning").value = guess.meaning || "";
   renderPairedEditRows(guess.word_ar_paired || []);
   if (!keepAside) mountRegenAside($(".deck-layout", $("#editModalBody")), guess);

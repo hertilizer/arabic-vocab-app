@@ -31,6 +31,17 @@
   color: var(--text-faint);
   pointer-events: none;
 }
+.card-form {
+  position: absolute;
+  right: 16px;
+  bottom: 14px;
+  margin: 0;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+  pointer-events: none;
+}
 
 .root-chip {
   background: var(--surface-2);

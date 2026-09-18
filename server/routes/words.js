@@ -1,5 +1,6 @@
 const { db, buildSearchBlob, stripHarakat, rowToEntry, checkDuplicate } = require("../db");
 const { applyStem } = require("../stems");
+const { normalizeForm } = require("../lib/form");
 
 function normalizeDateLearned(value) {
   const s = String(value ?? "").trim();
@@ -107,7 +108,7 @@ function mountWordRoutes(app) {
   });
 
   app.post("/api/words", (req, res) => {
-    const { word_ar, word_ar_paired = [], root = "", part_of_speech = "", meaning = "", notes = "", date_learned = "", allowNewStem = false } = req.body;
+    const { word_ar, word_ar_paired = [], root = "", part_of_speech = "", meaning = "", notes = "", date_learned = "", form, allowNewStem = false } = req.body;
     if (!word_ar) return res.status(400).json({ error: "word_ar is required" });
     const check = checkDuplicate(word_ar, { root, part_of_speech, word_ar_paired });
     if (check.existing) {
@@ -119,8 +120,8 @@ function mountWordRoutes(app) {
     const search_blob = buildSearchBlob(word_ar, word_ar_paired);
     const learned = normalizeDateLearned(date_learned);
     const stmt = db.prepare(`
-      INSERT INTO words (word_ar, word_ar_paired, root, part_of_speech, meaning, notes, search_blob, date_learned)
-      VALUES (@word_ar, @word_ar_paired, @root, @part_of_speech, @meaning, @notes, @search_blob, @date_learned)
+      INSERT INTO words (word_ar, word_ar_paired, root, part_of_speech, meaning, notes, search_blob, date_learned, form)
+      VALUES (@word_ar, @word_ar_paired, @root, @part_of_speech, @meaning, @notes, @search_blob, @date_learned, @form)
     `);
     const info = stmt.run({
       word_ar,
@@ -130,7 +131,8 @@ function mountWordRoutes(app) {
       meaning,
       notes,
       search_blob,
-      date_learned: learned
+      date_learned: learned,
+      form: Object.prototype.hasOwnProperty.call(req.body, "form") ? normalizeForm(form) : null
     });
     const row = db.prepare("SELECT * FROM words WHERE id = ?").get(info.lastInsertRowid);
     res.status(201).json(rowToEntry(row));
@@ -150,14 +152,15 @@ function mountWordRoutes(app) {
       notes: req.body.notes ?? existing.notes,
       date_learned: req.body.date_learned !== undefined
         ? normalizeDateLearned(req.body.date_learned)
-        : (existing.date_learned || "")
+        : (existing.date_learned || ""),
+      form: req.body.form !== undefined ? normalizeForm(req.body.form) : existing.form
     };
     const search_blob = buildSearchBlob(merged.word_ar, merged.word_ar_paired);
 
     db.prepare(`
       UPDATE words SET word_ar=@word_ar, word_ar_paired=@word_ar_paired, root=@root,
         part_of_speech=@part_of_speech, meaning=@meaning, notes=@notes, search_blob=@search_blob,
-        date_learned=@date_learned
+        date_learned=@date_learned, form=@form
       WHERE id=@id
     `).run({
       ...merged,

@@ -200,7 +200,8 @@ function applyStem(payload, form) {
       { label: "ماضٍ", word_ar: spec.past },
       { label: "أمر", word_ar: spec.imperative }
     ],
-    stemForm: form
+    stemForm: form,
+    form
   };
 }
 

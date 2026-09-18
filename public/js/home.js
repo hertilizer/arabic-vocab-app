@@ -19,6 +19,7 @@ function renderCard(entry) {
   el.dataset.id = entry.id;
   el.innerHTML = `
     <div class="card-word" dir="rtl">${escapeHtml(stripHarakat(entry.word_ar))}</div>
+    ${entry.form ? `<div class="card-form">${escapeHtml(entry.form)}</div>` : ""}
     <div class="card-added">${escapeHtml(addedAgo(entryDisplayDate(entry)))}</div>
   `;
   el.addEventListener("click", () => openCardDetail(entry.id));

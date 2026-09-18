@@ -202,6 +202,7 @@ export async function openCardDetail(id, { saved = false, entry = null, fromNav 
     <div class="flip-face flip-front">
       <div class="detail-kicker-row">
         ${root ? `<span class="root-chip" id="detailRootChip">${escapeHtml(word.root)}</span>` : ""}
+        ${word.form ? `<span class="detail-form-mark">${escapeHtml(word.form)}</span>` : ""}
         ${harakatBtn()}
       </div>
       <div class="detail-primary${word.part_of_speech ? " has-pos-tip" : ""}" dir="rtl"${word.part_of_speech ? ` data-tooltip="${escapeHtml(word.part_of_speech)}" tabindex="0"` : ""}>${arHtml(word.word_ar)}</div>

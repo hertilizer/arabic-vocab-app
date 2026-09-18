@@ -1,5 +1,6 @@
 const POS_LIST = require("../pos-list");
 const { requireClient, parseJsonResponse, cachedSystem } = require("./client");
+const { normalizeForm } = require("../lib/form");
 
 const SYSTEM_PROMPT = `You are an expert in Arabic grammar and Levantine/Jordanian dialect (amiya) vocabulary.
 Given a single Arabic word or phrase, produce structured data for a vocabulary notebook.
@@ -33,9 +34,13 @@ Rules:
   - For idioms, loanwords, and particles: return an empty array.
   - Do NOT duplicate the primary word_ar inside this array.
 - If the input is an idiom/multi-word phrase or a loanword, set "root" to "" and "part_of_speech" to "تعبير اصطلاحي" (idiom) or the closest fitting noun-like entry (loanword), and "word_ar_paired" to [].
+- "form": the verb stem / باب of THIS lexeme as a Roman numeral I–XV (I, II, III, IV, V, VI, VII, VIII, IX, X, XI, XII, XIII, XIV, XV).
+  - Use it for verbs, masdars, participles, and other nouns derived on that stem (اسم مكان, اسم آلة, etc.).
+  - Return "" for underived/jamid nouns, loanwords, particles, idioms, proper names, or when I–XV does not apply to this word.
+  - Classify the lexeme, not the root: خبز "bread" is ""; مخبز "bakery" is "I".
 
 Respond with ONLY a raw JSON object, no markdown fences, no preamble, matching this exact shape:
-{"word_ar": "...", "root": "...", "part_of_speech": "...", "meaning": "...", "word_ar_paired": [{"label": "...", "word_ar": "..."}], "reroll_why": ""}
+{"word_ar": "...", "root": "...", "part_of_speech": "...", "meaning": "...", "word_ar_paired": [{"label": "...", "word_ar": "..."}], "form": "", "reroll_why": ""}
 - "reroll_why": always a string. Leave "" unless the user provided a note/correction. When they did, write 1–3 short English sentences: which fields you changed and why, OR why you kept the original (the note was already satisfied, conflicts with amiya or the dictionary base-form rules, or you are not confident). Never invent a change just to satisfy the note.`;
 
 function sanitizeExisting(existing) {
@@ -58,6 +63,7 @@ function buildUserPrompt({ word_ar, note, existing }) {
 
 function normalizeGuess(result, note) {
   if (!result || typeof result !== "object") return result;
+  result.form = normalizeForm(result.form);
   if (note) result.reroll_why = String(result.reroll_why || "").trim();
   else delete result.reroll_why;
   return result;

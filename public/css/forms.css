@@ -307,7 +307,7 @@
 
 .entry-split {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr minmax(88px, 0.7fr);
   gap: 12px;
   align-items: end;
 }
