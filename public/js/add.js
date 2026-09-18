@@ -1000,7 +1000,7 @@ function waitCardAnim(card, ms = 450) {
     card.addEventListener("animationend", (e) => {
       if (e.target !== card) return;
       const name = String(e.animationName || "");
-      if (!/fly|tuck|blank/i.test(name)) return;
+      if (!/fly|tuck|cycle|blank/i.test(name)) return;
       if (e.elapsedTime < 0.12) return;
       finish();
     });
@@ -1028,7 +1028,7 @@ function deckCardEl(item) {
 }
 
 function setCardLayer(card, i) {
-  card.classList.remove("is-top", "is-next", "is-back", "is-tucking", "is-flying-add", "is-flying-skip");
+  card.classList.remove("is-top", "is-next", "is-back", "is-cycling", "is-flying-add", "is-flying-skip");
   card.classList.add(layerClass(i));
   if (i === 0) {
     card.removeAttribute("inert");
@@ -1038,19 +1038,46 @@ function setCardLayer(card, i) {
   }
 }
 
+function measureCardHeight(card) {
+  if (!card) return 460;
+  const form = card.querySelector(".entry-form");
+  const prev = {
+    height: card.style.height,
+    minHeight: card.style.minHeight,
+    overflow: card.style.overflow,
+    transition: card.style.transition,
+    formMin: form?.style.minHeight || ""
+  };
+  card.style.transition = "none";
+  card.style.height = "auto";
+  card.style.minHeight = "0";
+  card.style.overflow = "visible";
+  if (form) form.style.minHeight = "0";
+  const h = Math.max(card.scrollHeight, 460);
+  card.style.height = prev.height;
+  card.style.minHeight = prev.minHeight;
+  card.style.overflow = prev.overflow;
+  card.style.transition = prev.transition;
+  if (form) form.style.minHeight = prev.formMin;
+  return h;
+}
+
+function applyDeckHeight(h, { scene = $(".deck-scene") } = {}) {
+  if (!scene) return;
+  const layout = $(".deck-layout");
+  const px = `${Math.round(h)}px`;
+  scene.style.setProperty("--deck-h", px);
+  layout?.style.setProperty("--deck-h", px);
+  const w = `${Math.round(scene.getBoundingClientRect().width)}px`;
+  scene.style.setProperty("--deck-w", w);
+  layout?.style.setProperty("--deck-w", w);
+}
+
 function syncDeckLayout() {
   const scene = $(".deck-scene");
   const top = $(".deck-card.is-top");
   if (!scene || !top) return;
-  top.style.height = "auto";
-  const h = Math.max(top.scrollHeight, 460);
-  const layout = $(".deck-layout");
-  scene.style.setProperty("--deck-h", `${h}px`);
-  layout?.style.setProperty("--deck-h", `${h}px`);
-  const w = `${Math.round(scene.getBoundingClientRect().width)}px`;
-  scene.style.setProperty("--deck-w", w);
-  layout?.style.setProperty("--deck-w", w);
-  top.style.height = "";
+  applyDeckHeight(measureCardHeight(top), { scene });
 }
 
 function layerClass(i) {
@@ -1065,9 +1092,12 @@ function fillCard(card, item, i) {
   delete card.dataset.bound;
   delete card.dataset.ready;
   if (i > 1) {
-    card.classList.add("is-blank");
-    card.innerHTML = "";
+    card.className = `deck-card ${layerClass(i)}`;
     card.setAttribute("inert", "");
+    if (!card.innerHTML.trim()) {
+      card.classList.add("is-blank");
+      card.innerHTML = "";
+    }
     return;
   }
   if (!item.guess) {
@@ -1081,6 +1111,7 @@ function fillCard(card, item, i) {
   card.classList.remove("is-blank");
   card.dataset.ready = "1";
   card.innerHTML = withCardClose(entryFormHtml(item.guess, { isBatch: true }));
+  renderAddPairedRows(item.guess.word_ar_paired || [], card, isTakenStem(item.guess));
   if (i === 0) {
     card.removeAttribute("inert");
     bindTopCard(card, item);
@@ -1154,9 +1185,11 @@ async function dismissTop(kind) {
   top.classList.add(`is-flying-${kind}`);
   startAsideFly(aside, kind);
   if (next) {
+    applyDeckHeight(measureCardHeight(next));
     next.classList.remove("is-next");
     next.classList.add("is-top");
     next.removeAttribute("inert");
+    bindTopCard(next, batch.items[1]);
   }
   await Promise.all([
     waitCardAnim(top, 450),
@@ -1184,7 +1217,9 @@ function restackDom() {
     setCardLayer(card, i);
     const sameReady = item.guess && card.dataset.ready === "1" && card.dataset.uid === String(item.uid);
     if (i === 0 && sameReady) bindTopCard(card, item);
-    else if (!(i === 1 && sameReady)) fillCard(card, item, i);
+    else if (i > 1) {
+      card.setAttribute("inert", "");
+    } else if (!(i === 1 && sameReady)) fillCard(card, item, i);
   });
   const topItem = batch.items[0];
   if (topItem) {
@@ -1199,18 +1234,47 @@ async function tuckTopToBack() {
   const scene = $(".deck-scene");
   const top = $(".deck-card.is-top");
   const next = $(".deck-card.is-next");
+  const back = $(".deck-card.is-back");
   if (!top || !next || !scene) return;
   batchAnimating = true;
-  const aside = adoptRegenAside(top);
-  const toBack = $$(".deck-card", scene).length > 2;
-  scene.appendChild(top);
-  void top.offsetWidth;
+  const aside = adoptRegenAside(top) || flyingRegenAside(top);
+  const remaining = $$(".deck-card", scene).filter((card) => card !== top);
+  const dest = remaining.length >= 2 ? "is-back" : "is-next";
+  const destY = remaining.length >= 2 ? "24px" : "12px";
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const outH = Math.max(top.getBoundingClientRect().height, next.getBoundingClientRect().height);
+  const nextH = measureCardHeight(next);
+  top.style.setProperty("--deck-under-y", destY);
+  top.style.setProperty("--deck-cycle-h", `${top.getBoundingClientRect().height}px`);
+  top.style.setProperty("--deck-cycle-out", `${Math.round(Math.max(outH, nextH) + 28)}px`);
+  applyDeckHeight(nextH);
   top.classList.remove("is-top");
-  top.classList.add(toBack ? "is-tucking" : "is-next");
+  top.setAttribute("inert", "");
+  if (reduced) top.classList.add(dest);
+  else top.classList.add("is-cycling");
   next.classList.remove("is-next");
   next.classList.add("is-top");
   next.removeAttribute("inert");
-  await Promise.all([waitCardTransition(next, 430), waitCardTransition(top, 430)]);
+  bindTopCard(next, batch.items[1]);
+  if (back) {
+    back.classList.remove("is-back");
+    back.classList.add("is-next");
+  }
+  if (aside) {
+    aside.style.opacity = "0";
+    aside.style.pointerEvents = "none";
+  }
+  if (!reduced) await waitCardAnim(top, 840);
+  top.style.transition = "none";
+  top.style.transform = `translate(0, ${destY})`;
+  top.classList.remove("is-cycling");
+  top.classList.add(dest);
+  void top.offsetWidth;
+  top.style.removeProperty("transform");
+  top.style.removeProperty("transition");
+  top.style.removeProperty("--deck-under-y");
+  top.style.removeProperty("--deck-cycle-h");
+  top.style.removeProperty("--deck-cycle-out");
   aside?.remove();
 }
 

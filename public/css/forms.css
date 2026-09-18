@@ -146,10 +146,18 @@
   to { transform: none; opacity: 1; }
 }
 
+@property --deck-h {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 460px;
+}
+
 .deck-scene {
   position: relative;
   width: 100%;
   height: calc(var(--deck-h, 460px) + 24px);
+  overflow: visible;
+  transition: height 0.42s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .deck-card {
   position: absolute;
@@ -164,7 +172,7 @@
   height: var(--deck-h, 460px);
   overflow: hidden;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.32);
-  transition: transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 0.42s cubic-bezier(0.22, 1, 0.36, 1), height 0.42s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .deck-card.is-top {
   z-index: 5;
@@ -186,28 +194,31 @@
 }
 .deck-card.is-next .entry-actions,
 .deck-card.is-back .entry-actions,
-.deck-card.is-tucking .entry-actions,
+.deck-card.is-cycling .entry-actions,
 .deck-card.is-next > .modal-close,
 .deck-card.is-back > .modal-close,
-.deck-card.is-tucking > .modal-close {
+.deck-card.is-cycling > .modal-close {
   visibility: hidden;
 }
-.deck-card.is-back,
-.deck-card.is-tucking {
+.deck-card.is-back {
   z-index: 1;
   transform: translateY(24px);
   pointer-events: none;
 }
-.deck-card.is-tucking {
-  z-index: 0;
+.deck-card.is-cycling {
+  z-index: 8;
   overflow: visible;
+  pointer-events: none;
+  transition: none;
+  height: var(--deck-cycle-h, var(--deck-h));
+  animation: deck-cycle-under 0.78s cubic-bezier(0.22, 0.82, 0.28, 1) forwards;
 }
-.deck-card.is-tucking > .reroll-aside,
+.deck-card.is-cycling > .reroll-aside,
 .deck-card.is-next > .reroll-aside,
 .deck-card.is-back > .reroll-aside {
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: opacity 0.2s ease;
 }
 .deck-card.is-blank {
   background: var(--surface);
@@ -292,6 +303,24 @@ html[data-theme="light"] .skel::after {
   100% { transform: translateX(-100%); }
 }
 
+@keyframes deck-cycle-under {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+    z-index: 8;
+  }
+  48% {
+    transform: translate(6%, var(--deck-cycle-out, calc(100% + 28px))) rotate(4deg);
+    z-index: 8;
+  }
+  52% {
+    transform: translate(6%, var(--deck-cycle-out, calc(100% + 28px))) rotate(4deg);
+    z-index: 0;
+  }
+  100% {
+    transform: translate(0, var(--deck-under-y, 24px)) rotate(0deg);
+    z-index: 0;
+  }
+}
 @keyframes deck-fly-add {
   to { transform: translateX(118%) rotate(12deg); opacity: 0; }
 }
@@ -867,10 +896,13 @@ html[data-theme="light"] .skel::after {
 
 @media (prefers-reduced-motion: reduce) {
   .modal.add-modal.is-deck { transition: none; }
+  .deck-scene,
+  .deck-card { transition: none; }
   .reroll-aside { animation: none; }
   .reroll-aside.is-flying-skip,
   .reroll-aside.is-flying-add { opacity: 0; }
   .skel::after { animation: none; }
+  .deck-card.is-cycling { animation: none; }
 }
 
 @media (max-width: 900px) {
