@@ -113,6 +113,24 @@
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.32);
   animation: reroll-aside-in 0.55s 0.08s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+.reroll-aside[data-aside-slot="current"] {
+  z-index: 7;
+}
+.reroll-aside.is-waiting {
+  z-index: 5;
+  opacity: 0;
+  pointer-events: none;
+  animation: none;
+}
+.reroll-aside.is-entering {
+  z-index: 6;
+  animation: reroll-aside-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.reroll-aside.is-tucking-aside {
+  z-index: 8;
+  pointer-events: none;
+  animation: aside-tuck 0.42s cubic-bezier(0.22, 0.8, 0.36, 1) forwards;
+}
 .deck-layout > .entry-form ~ .reroll-aside {
   top: 0;
   bottom: 0;
@@ -340,6 +358,9 @@ html[data-theme="light"] .skel::after {
     transform: translateX(calc(0.62 * var(--deck-w, 980px))) rotate(5deg);
     opacity: 0;
   }
+}
+@keyframes aside-tuck {
+  to { transform: translateY(24px); opacity: 0; }
 }
 
 .entry-kicker {

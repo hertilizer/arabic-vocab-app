@@ -68,43 +68,102 @@ export function regenAsideHtml(guess) {
     </aside>`;
 }
 
+function asideMeta(guess) {
+  return {
+    note: String(guess?.reroll_note || "").trim(),
+    why: String(guess?.reroll_why || "").trim(),
+    kind: String(guess?.reroll_kind || ""),
+    field: String(guess?.reroll_field || "")
+  };
+}
+
 function setAsideOpen(host, on) {
   host.classList.toggle("has-reroll-aside", on);
   host.closest(".modal")?.classList.toggle("has-reroll-aside", on);
 }
 
+function syncAsideSlot(host, slot, guess) {
+  const meta = asideMeta(guess);
+  const html = regenAsideHtml(guess);
+  const cur = host.querySelector(`:scope > .reroll-aside[data-aside-slot="${slot}"]`);
+  if (!html) {
+    cur?.remove();
+    return null;
+  }
+  if (cur && cur.dataset.note === meta.note && cur.dataset.why === meta.why && cur.dataset.kind === meta.kind && cur.dataset.field === meta.field) {
+    cur.classList.toggle("is-waiting", slot === "next");
+    if (slot === "next") {
+      cur.classList.remove("is-entering", "is-flying-skip", "is-flying-add", "is-tucking-aside");
+      cur.style.animation = "none";
+    }
+    return cur;
+  }
+  cur?.remove();
+  host.insertAdjacentHTML("beforeend", html);
+  const aside = [...host.querySelectorAll(":scope > .reroll-aside")].find((el) => !el.dataset.asideSlot);
+  if (!aside) return null;
+  aside.dataset.asideSlot = slot;
+  aside.dataset.note = meta.note;
+  aside.dataset.why = meta.why;
+  aside.dataset.kind = meta.kind;
+  aside.dataset.field = meta.field;
+  if (slot === "next") {
+    aside.classList.add("is-waiting");
+    aside.style.animation = "none";
+  }
+  return aside;
+}
+
 export function adoptRegenAside(card) {
   const layout = card?.closest(".deck-layout") || $(".deck-layout");
-  const aside = layout?.querySelector(":scope > .reroll-aside");
+  const aside = layout?.querySelector(':scope > .reroll-aside[data-aside-slot="current"]');
   if (card && aside) card.appendChild(aside);
   return aside;
 }
 
-export function mountRegenAside(host, guess) {
-  if (!host) return;
-  const note = String(guess?.reroll_note || "").trim();
-  const why = String(guess?.reroll_why || "").trim();
-  const kind = String(guess?.reroll_kind || "");
-  const field = String(guess?.reroll_field || "");
-  const cur = host.querySelector(":scope > .reroll-aside");
-  if (cur && cur.dataset.note === note && cur.dataset.why === why && cur.dataset.kind === kind && cur.dataset.field === field) {
-    setAsideOpen(host, true);
-    return;
+export function revealWaitingAside(host) {
+  const waiting = host?.querySelector(':scope > .reroll-aside[data-aside-slot="next"]');
+  if (!waiting) {
+    setAsideOpen(host, false);
+    return null;
   }
-  const alreadyOpen = host.classList.contains("has-reroll-aside");
-  cur?.remove();
-  const html = regenAsideHtml(guess);
-  if (!html) {
+  waiting.classList.remove("is-waiting", "is-entering");
+  waiting.style.removeProperty("animation");
+  void waiting.offsetWidth;
+  waiting.classList.add("is-entering");
+  setAsideOpen(host, true);
+  return waiting;
+}
+
+export function promoteWaitingAside(host) {
+  if (!host) return;
+  host.querySelectorAll(':scope > .reroll-aside[data-aside-slot="current"]').forEach((el) => el.remove());
+  const waiting = host.querySelector(':scope > .reroll-aside[data-aside-slot="next"]');
+  if (!waiting) {
     setAsideOpen(host, false);
     return;
   }
-  host.insertAdjacentHTML("beforeend", html);
-  const aside = host.querySelector(":scope > .reroll-aside");
-  if (aside) {
-    aside.dataset.note = note;
-    aside.dataset.why = why;
-    aside.dataset.kind = kind;
-    aside.dataset.field = field;
+  waiting.dataset.asideSlot = "current";
+  waiting.classList.remove("is-waiting", "is-entering");
+  waiting.style.removeProperty("animation");
+  setAsideOpen(host, true);
+}
+
+export function mountDeckAsides(host, currentGuess, nextGuess) {
+  if (!host) return;
+  syncAsideSlot(host, "current", currentGuess);
+  syncAsideSlot(host, "next", nextGuess);
+  setAsideOpen(host, !!host.querySelector(':scope > .reroll-aside[data-aside-slot="current"]'));
+}
+
+export function mountRegenAside(host, guess) {
+  if (!host) return;
+  host.querySelectorAll(':scope > .reroll-aside[data-aside-slot="next"]').forEach((el) => el.remove());
+  const alreadyOpen = host.classList.contains("has-reroll-aside");
+  const aside = syncAsideSlot(host, "current", guess);
+  if (!aside) {
+    setAsideOpen(host, false);
+    return;
   }
   if (alreadyOpen) {
     setAsideOpen(host, true);

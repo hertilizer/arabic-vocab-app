@@ -3,7 +3,7 @@ import { api } from "./lib/api.js";
 import { state } from "./lib/state.js";
 import { ICONS, quietIconBtn } from "./lib/icons.js";
 import { stripHarakat } from "./lib/harakat.js";
-import { regenExpandHtml, currentRegenNote, isRegenOpen, bindRegenExpand, collapseRegenOnPointerDown, stripAutofillExisting, attachRegenMeta, attachFieldRegen, mountRegenAside, adoptRegenAside } from "./lib/regen.js";
+import { regenExpandHtml, currentRegenNote, isRegenOpen, bindRegenExpand, collapseRegenOnPointerDown, stripAutofillExisting, attachRegenMeta, attachFieldRegen, mountRegenAside, mountDeckAsides, adoptRegenAside, revealWaitingAside, promoteWaitingAside } from "./lib/regen.js";
 import { formOptions } from "./lib/form.js";
 import { loadHome } from "./home.js";
 import { openCardDetail } from "./detail.js";
@@ -186,7 +186,7 @@ function paintCurrentGuess() {
     card.innerHTML = withCardClose(entryFormHtml(g, { isBatch: true }));
     delete card.dataset.bound;
     bindTopCard(card, item);
-    mountRegenAside($(".deck-layout"), g);
+    syncDeckAsides();
     requestAnimationFrame(syncDeckLayout);
     return;
   }
@@ -972,10 +972,17 @@ async function showCurrentDeckItem() {
   if (!item.guess) await fillItem(item);
 }
 
+function syncDeckAsides() {
+  const layout = $(".deck-layout");
+  if (!layout || !batch) return;
+  mountDeckAsides(layout, batch.items[0]?.guess, batch.items[1]?.guess);
+}
+
 function flyingRegenAside(top) {
   const layout = top?.closest(".deck-layout") || $(".deck-layout");
   if (!layout) return null;
-  const aside = layout.querySelector(":scope > .reroll-aside") || top?.querySelector(":scope > .reroll-aside");
+  const aside = layout.querySelector(':scope > .reroll-aside[data-aside-slot="current"]')
+    || top?.querySelector(".reroll-aside");
   if (aside && aside.parentElement !== layout) layout.appendChild(aside);
   return aside;
 }
@@ -1149,16 +1156,19 @@ function refreshDeckCard(item) {
   const sameReady = item.guess && card.dataset.ready === "1" && card.dataset.uid === String(item.uid);
   if (sameReady && idx === 0 && card.dataset.bound === "1") {
     writeGuessFields(item.guess, card);
-    mountRegenAside($(".deck-layout"), item.guess);
+    syncDeckAsides();
     return;
   }
-  if (sameReady && idx > 0) return;
+  if (sameReady && idx > 0) {
+    syncDeckAsides();
+    return;
+  }
   fillCard(card, item, idx);
   if (idx === 0) {
     state.currentAddWord = item.typed;
     state.currentAddGuess = item.guess;
-    mountRegenAside($(".deck-layout"), item.guess);
   }
+  syncDeckAsides();
   requestAnimationFrame(syncDeckLayout);
 }
 
@@ -1171,7 +1181,7 @@ function renderDeck() {
     const card = deckCardEl(item);
     if (card) fillCard(card, item, i);
   });
-  mountRegenAside($(".deck-layout"), batch.items[0]?.guess);
+  mountDeckAsides($(".deck-layout"), batch.items[0]?.guess, batch.items[1]?.guess);
   requestAnimationFrame(syncDeckLayout);
 }
 
@@ -1179,11 +1189,13 @@ async function dismissTop(kind) {
   const top = $(".deck-card.is-top");
   const next = $(".deck-card.is-next");
   if (!top) return;
+  const layout = $(".deck-layout");
   const aside = flyingRegenAside(top);
   batchAnimating = true;
   top.classList.remove("is-top");
   top.classList.add(`is-flying-${kind}`);
   startAsideFly(aside, kind);
+  revealWaitingAside(layout);
   if (next) {
     applyDeckHeight(measureCardHeight(next));
     next.classList.remove("is-next");
@@ -1196,6 +1208,7 @@ async function dismissTop(kind) {
     aside ? waitCardAnim(aside, kind === "add" ? 580 : 360) : Promise.resolve()
   ]);
   aside?.remove();
+  promoteWaitingAside(layout);
   top.remove();
 }
 
@@ -1226,7 +1239,7 @@ function restackDom() {
     state.currentAddWord = topItem.typed;
     state.currentAddGuess = topItem.guess;
   }
-  mountRegenAside($(".deck-layout"), topItem?.guess);
+  syncDeckAsides();
   requestAnimationFrame(syncDeckLayout);
 }
 
@@ -1237,7 +1250,8 @@ async function tuckTopToBack() {
   const back = $(".deck-card.is-back");
   if (!top || !next || !scene) return;
   batchAnimating = true;
-  const aside = adoptRegenAside(top) || flyingRegenAside(top);
+  const layout = $(".deck-layout");
+  const aside = flyingRegenAside(top);
   const remaining = $$(".deck-card", scene).filter((card) => card !== top);
   const dest = remaining.length >= 2 ? "is-back" : "is-next";
   const destY = remaining.length >= 2 ? "24px" : "12px";
@@ -1261,9 +1275,12 @@ async function tuckTopToBack() {
     back.classList.add("is-next");
   }
   if (aside) {
-    aside.style.opacity = "0";
-    aside.style.pointerEvents = "none";
+    aside.classList.remove("is-flying-skip", "is-flying-add");
+    aside.style.removeProperty("animation");
+    void aside.offsetWidth;
+    aside.classList.add("is-tucking-aside");
   }
+  revealWaitingAside(layout);
   if (!reduced) await waitCardAnim(top, 840);
   top.style.transition = "none";
   top.style.transform = `translate(0, ${destY})`;
@@ -1276,6 +1293,7 @@ async function tuckTopToBack() {
   top.style.removeProperty("--deck-cycle-h");
   top.style.removeProperty("--deck-cycle-out");
   aside?.remove();
+  promoteWaitingAside(layout);
 }
 
 async function afterDeckChange() {
