@@ -487,6 +487,14 @@ html[data-theme="light"] .skel::after {
 .dup-notice.collision-notice {
   min-height: 0;
 }
+.modal.add-modal.is-dup .dup-notice.collision-notice,
+.modal.add-modal.is-dup .dup-notice.compact-duplicate {
+  min-height: 0;
+}
+.modal.add-modal.is-dup .dup-notice.compact-duplicate .dup-section,
+.modal.add-modal.is-dup .dup-notice.compact-duplicate .dup-grid {
+  flex: 0 0 auto;
+}
 .dup-section {
   display: flex;
   flex-direction: column;

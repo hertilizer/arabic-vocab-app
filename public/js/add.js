@@ -1682,6 +1682,7 @@ function renderResultSummary({ added = [], duplicates = [], check = null, typedW
     return;
   }
   const showOtherStems = !addedList.length && dupList.length === 1 && check?.otherStems?.length && isVerbPos(dupList[0].part_of_speech);
+  const compactDuplicate = !addedList.length && dupList.length === 1;
   if (showOtherStems) {
     ensureStemJob({
       typed: typedWord || state.currentAddWord,
@@ -1699,7 +1700,7 @@ function renderResultSummary({ added = [], duplicates = [], check = null, typedW
   const addedDelay = 0;
   const dupDelay = addedList.length ? 0.12 + addedList.length * 0.05 : 0;
   $("#addModalBody").innerHTML = `
-    <div class="dup-notice${showOtherStems ? " collision-notice" : ""}">
+    <div class="dup-notice${showOtherStems ? " collision-notice" : ""}${compactDuplicate ? " compact-duplicate" : ""}">
       ${summarySection({ entries: addedList, stamp: "أُضيفت", variant: "added", delay: addedDelay })}
       ${summarySection({ entries: dupList, stamp: "في الدفتر", variant: "dup", delay: dupDelay })}
       <div class="entry-actions">
