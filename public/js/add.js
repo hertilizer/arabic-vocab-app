@@ -120,7 +120,8 @@ function attachStems(guess, check) {
     ? guess.stemForm
     : (STEM_FORMS.includes(stems.form) ? stems.form : "I");
   const next = { ...guess, stems, stemForm };
-  if (guess.form == null) next.form = stemForm;
+  if (!String(guess.form || "") && isVerbPos(guess.part_of_speech)) next.form = stemForm;
+  else if (guess.form == null) next.form = stemForm;
   return next;
 }
 
@@ -439,6 +440,7 @@ async function autofillAsStem(form, word_ar, previous) {
       word_ar_paired: applied.word_ar_paired,
       root: filled.root || applied.root,
       part_of_speech: filled.part_of_speech || applied.part_of_speech,
+      form: filled.form || applied.form || form,
       notes: prior.notes || "",
       date_learned: guess.date_learned
     }, note, { kind: "full" });
@@ -1368,6 +1370,10 @@ function addLoadingHtml(word, { isBatch = false } = {}) {
             </div>
             <div class="entry-field">
               <div class="entry-label"><label>Part of speech</label></div>
+              <span class="skel"></span>
+            </div>
+            <div class="entry-field">
+              <div class="entry-label"><label>Form</label></div>
               <span class="skel"></span>
             </div>
           </div>

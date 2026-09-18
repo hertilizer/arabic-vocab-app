@@ -34,13 +34,14 @@ Rules:
   - For idioms, loanwords, and particles: return an empty array.
   - Do NOT duplicate the primary word_ar inside this array.
 - If the input is an idiom/multi-word phrase or a loanword, set "root" to "" and "part_of_speech" to "تعبير اصطلاحي" (idiom) or the closest fitting noun-like entry (loanword), and "word_ar_paired" to [].
-- "form": the verb stem / باب of THIS lexeme as a Roman numeral I–XV (I, II, III, IV, V, VI, VII, VIII, IX, X, XI, XII, XIII, XIV, XV).
-  - Use it for verbs, masdars, participles, and other nouns derived on that stem (اسم مكان, اسم آلة, etc.).
-  - Return "" for underived/jamid nouns, loanwords, particles, idioms, proper names, or when I–XV does not apply to this word.
-  - Classify the lexeme, not the root: خبز "bread" is ""; مخبز "bakery" is "I".
+- "form": required. The باب of THIS lexeme as a Roman numeral I–XV (I, II, III, IV, V, VI, VII, VIII, IX, X, XI, XII, XIII, XIV, XV), or "".
+  - Verbs almost always have a form: يكتب = I, يدرّس / يعلّم = II, يُرسِل = IV, يتعلّم = V, يستعمل = X. Do not return "" just because you are unsure which of two nearby stems it is — pick the best match.
+  - Also use I–XV for masdars, participles, and other nouns derived on that stem (اسم مكان, اسم آلة, etc.).
+  - Return "" ONLY for underived/jamid nouns, loanwords, particles, idioms, proper names, or when I–XV truly does not apply.
+  - Classify the lexeme, not the root: خبز "bread" is "". مخبز "bakery" is "I". تعليم is "II".
 
 Respond with ONLY a raw JSON object, no markdown fences, no preamble, matching this exact shape:
-{"word_ar": "...", "root": "...", "part_of_speech": "...", "meaning": "...", "word_ar_paired": [{"label": "...", "word_ar": "..."}], "form": "", "reroll_why": ""}
+{"word_ar": "...", "root": "...", "part_of_speech": "...", "form": "I", "meaning": "...", "word_ar_paired": [{"label": "...", "word_ar": "..."}], "reroll_why": ""}
 - "reroll_why": always a string. Leave "" unless the user provided a note/correction. When they did, write 1–3 short English sentences: which fields you changed and why, OR why you kept the original (the note was already satisfied, conflicts with amiya or the dictionary base-form rules, or you are not confident). Never invent a change just to satisfy the note.`;
 
 function sanitizeExisting(existing) {
@@ -73,7 +74,7 @@ async function autofillEntry({ word_ar, note, existing }) {
   const anthropic = requireClient();
   const resp = await anthropic.messages.create({
     model: "claude-sonnet-4-5",
-    max_tokens: note ? 800 : 500,
+    max_tokens: note ? 900 : 800,
     system: cachedSystem(SYSTEM_PROMPT),
     messages: [{ role: "user", content: buildUserPrompt({ word_ar, note, existing }) }]
   });
