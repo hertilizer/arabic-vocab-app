@@ -8,6 +8,7 @@ import { initEdit, applyEditNav } from "./edit.js";
 import { initAdd, applyAddNav } from "./add.js";
 import { initExport } from "./export.js";
 import { initNav, parseLocation, navigate } from "./lib/nav.js";
+import { initTheme } from "./lib/theme.js";
 
 function initShemaghParallax() {
   const SHEMAGH_PARALLAX = 0.4;
@@ -15,7 +16,7 @@ function initShemaghParallax() {
   let shemaghTick = false;
   function updateShemaghParallax() {
     if (shemaghBg) {
-      shemaghBg.style.transform = `translate3d(0, ${-window.scrollY * SHEMAGH_PARALLAX}px, 0)`;
+      shemaghBg.style.backgroundPosition = `0 ${-window.scrollY * SHEMAGH_PARALLAX}px`;
     }
     shemaghTick = false;
   }
@@ -43,6 +44,7 @@ async function init() {
   initEdit();
   initAdd();
   initExport();
+  initTheme();
   initShemaghParallax();
   initNav(applyNav);
   const initial = parseLocation();

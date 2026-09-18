@@ -4,6 +4,12 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>دفتري</title>
+<script>
+  try {
+    const theme = localStorage.getItem("theme");
+    if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme;
+  } catch { /* ignore */ }
+</script>
 <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
@@ -17,6 +23,7 @@
       <input id="searchInput" type="search" placeholder="ابحث…" autocomplete="off" dir="rtl" tabindex="-1" />
       <button type="button" class="search-expand-btn" id="searchToggle" aria-expanded="false" aria-controls="searchInput" aria-label="بحث" title="بحث"></button>
     </div>
+    <button id="themeToggle" class="icon-chip lg light" type="button" aria-label="Light mode" title="Light mode"></button>
     <button id="exportBtn" class="icon-chip lg light" type="button" aria-label="Export CSV" title="Export CSV"></button>
   </div>
 </header>

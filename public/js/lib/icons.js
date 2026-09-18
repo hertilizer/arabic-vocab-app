@@ -53,6 +53,17 @@ export const ICONS = {
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <rect x="4" y="5.5" width="16" height="14.5" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
       <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M8 3.8v4M16 3.8v4M4 10h16"/>
+    </svg>`,
+  sun: `
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="3.6" fill="none" stroke="currentColor" stroke-width="2"/>
+      <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+        d="M12 3.2v2.2M12 18.6v2.2M4.8 4.8l1.6 1.6M17.6 17.6l1.6 1.6M3.2 12h2.2M18.6 12h2.2M4.8 19.2l1.6-1.6M17.6 6.4l1.6-1.6"/>
+    </svg>`,
+  moon: `
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+        d="M16.8 13.6A6.4 6.4 0 0 1 10.4 5.2 7.2 7.2 0 1 0 18.8 14a6.2 6.2 0 0 1-2 0.4z"/>
     </svg>`
 };
 

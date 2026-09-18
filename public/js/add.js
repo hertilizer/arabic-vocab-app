@@ -28,9 +28,22 @@ function setAddModalKind(kind) {
     modal.classList.toggle("is-batch-start", kind === "batch-start");
     modal.classList.toggle("is-dup", kind === "dup");
     modal.classList.toggle("is-deck", kind === "deck");
+    if (kind !== "dup") {
+      modal.style.removeProperty("--dup-count");
+      modal.classList.remove("is-dup-lg", "is-dup-xl");
+    }
     if (kind !== "deck") modal.classList.remove("has-reroll-aside");
   }
   overlay?.classList.toggle("is-deck", kind === "deck");
+}
+
+function scaleDupModal(count) {
+  const modal = $("#addModal .modal");
+  if (!modal) return;
+  const n = Math.max(count, 1);
+  modal.style.setProperty("--dup-count", String(n));
+  modal.classList.toggle("is-dup-lg", n >= 6);
+  modal.classList.toggle("is-dup-xl", n >= 12);
 }
 
 function formRoot() {
@@ -85,12 +98,30 @@ const STEM_AUTOFILL_NOTES = {
 
 const STEM_FORMS = ["I", "II", "IV"];
 
+function isVerbPos(pos) {
+  return String(pos || "").startsWith("فعل");
+}
+
+function shouldOfferStemSwitch(g) {
+  const stems = g?.stems;
+  if (stems?.family !== "I-II-IV" || !stems.forms || stems.form === "other") return false;
+  if (isVerbPos(g?.part_of_speech)) return true;
+  return STEM_FORMS.includes(String(g?.form || ""));
+}
+
 function attachStems(guess, check) {
   if (!guess) return guess;
   const stems = check?.stems || guess.stems;
   if (!stems) return guess;
-  const form = STEM_FORMS.includes(guess.stemForm) ? guess.stemForm : (STEM_FORMS.includes(stems.form) ? stems.form : "I");
-  return { ...guess, stems, stemForm: form, form };
+  if (!shouldOfferStemSwitch({ ...guess, stems })) {
+    return { ...guess, stems };
+  }
+  const stemForm = STEM_FORMS.includes(guess.stemForm)
+    ? guess.stemForm
+    : (STEM_FORMS.includes(stems.form) ? stems.form : "I");
+  const next = { ...guess, stems, stemForm };
+  if (guess.form == null) next.form = stemForm;
+  return next;
 }
 
 function currentStemForm(g) {
@@ -330,8 +361,8 @@ function asCollisionCheck(check) {
 }
 
 function stemSwitchHtml(g) {
-  const stems = g?.stems;
-  if (stems?.family !== "I-II-IV" || !stems.forms) return "";
+  if (!shouldOfferStemSwitch(g)) return "";
+  const stems = g.stems;
   const current = currentStemForm(g);
   if (current === "other") return "";
   const job = stemJobs[familyKeyOf(stems)];
@@ -800,13 +831,10 @@ function fillItem(item) {
         body: JSON.stringify({ word_ar: item.typed })
       });
       if (item.seq !== seq || !batch) return;
-      if (check.stems?.family === "I-II-IV") {
-        ensureStemJob({ typed: item.typed, stems: check.stems, taken: check.taken || [], takenEntries: check.takenEntries });
-      }
       if (check.existing) {
         const dated = await applyBatchLearnedDate(check.existing);
         if (item.seq !== seq || !batch) return;
-        if (check.otherStems?.length && check.stems?.family === "I-II-IV") {
+        if (check.otherStems?.length && check.stems?.family === "I-II-IV" && isVerbPos(check.existing.part_of_speech)) {
           const job = ensureStemJob({ typed: item.typed, stems: check.stems, taken: check.taken || [], takenEntries: check.takenEntries });
           await waitAllStems(job);
           if (item.seq !== seq || !batch) return;
@@ -822,31 +850,22 @@ function fillItem(item) {
         item.existing = dated;
         return;
       }
-      if (check.collision && check.stems?.family === "I-II-IV") {
-        const job = ensureStemJob({ typed: item.typed, stems: check.stems, taken: check.taken || check.collision.taken || [], takenEntries: check.takenEntries });
-        await waitAllStems(job);
-        if (item.seq !== seq || !batch) return;
-        const form = defaultNewStem(check, job);
-        if (!form) {
-          const dated = await applyBatchLearnedDate(check.collision.existing);
+      if (!state.config.hasApiKey) {
+        if (check.collision && check.stems?.family === "I-II-IV") {
+          const job = ensureStemJob({ typed: item.typed, stems: check.stems, taken: check.taken || check.collision.taken || [], takenEntries: check.takenEntries });
+          await waitAllStems(job);
           if (item.seq !== seq || !batch) return;
-          item.existing = dated;
+          const form = defaultNewStem(check, job);
+          if (!form) {
+            const dated = await applyBatchLearnedDate(check.collision.existing);
+            if (item.seq !== seq || !batch) return;
+            item.existing = dated;
+            return;
+          }
+          item.guess = buildGuessFromJob(job, form, { date_learned: batch?.dateLearned || "" });
+          item.stemResolved = true;
           return;
         }
-        item.guess = buildGuessFromJob(job, form, { date_learned: batch?.dateLearned || "" });
-        item.stemResolved = true;
-        return;
-      }
-      if (check.stems?.family === "I-II-IV") {
-        const job = ensureStemJob({ typed: item.typed, stems: check.stems, taken: check.taken || [], takenEntries: check.takenEntries });
-        await waitAllStems(job);
-        if (item.seq !== seq || !batch) return;
-        item.guess = buildGuessFromJob(job, preferredStemForm(check.stems), {
-          date_learned: batch?.dateLearned || ""
-        }) || rememberCurrentStem(attachStems(emptyGuess(item.typed, batch?.dateLearned || ""), check));
-        return;
-      }
-      if (!state.config.hasApiKey) {
         item.guess = rememberCurrentStem(attachStems(emptyGuess(item.typed, batch?.dateLearned || ""), check));
         return;
       }
@@ -863,7 +882,7 @@ function fillItem(item) {
       if (after.existing) {
         const dated = await applyBatchLearnedDate(after.existing);
         if (item.seq !== seq || !batch) return;
-        if (after.otherStems?.length && after.stems?.family === "I-II-IV") {
+        if (after.otherStems?.length && after.stems?.family === "I-II-IV" && isVerbPos(after.existing.part_of_speech) && shouldOfferStemSwitch({ ...guess, stems: after.stems })) {
           const job = ensureStemJob({ typed: item.typed, stems: after.stems, taken: after.taken || [], takenEntries: after.takenEntries });
           await waitAllStems(job);
           if (item.seq !== seq || !batch) return;
@@ -879,7 +898,7 @@ function fillItem(item) {
         item.existing = dated;
         return;
       }
-      if (after.collision && after.stems?.family === "I-II-IV") {
+      if (after.collision && after.stems?.family === "I-II-IV" && shouldOfferStemSwitch({ ...guess, stems: after.stems })) {
         const job = ensureStemJob({ typed: item.typed, stems: after.stems, taken: after.taken || after.collision.taken || [], takenEntries: after.takenEntries });
         await waitAllStems(job);
         if (item.seq !== seq || !batch) return;
@@ -893,6 +912,9 @@ function fillItem(item) {
         return;
       }
       item.guess = rememberCurrentStem(attachStems({ ...guess, notes: "", date_learned: batch?.dateLearned || "" }, after));
+      if (shouldOfferStemSwitch(item.guess)) {
+        ensureStemJob({ typed: item.typed, stems: after.stems, seed: item.guess, taken: after.taken || [], takenEntries: after.takenEntries });
+      }
     } catch {
       if (item.seq !== seq || !batch) return;
       item.guess = emptyGuess(item.typed, batch?.dateLearned || "");
@@ -1567,7 +1589,7 @@ function renderResultSummary({ added = [], duplicates = [], check = null, typedW
     abortAdd();
     return;
   }
-  const showOtherStems = !addedList.length && dupList.length === 1 && check?.otherStems?.length;
+  const showOtherStems = !addedList.length && dupList.length === 1 && check?.otherStems?.length && isVerbPos(dupList[0].part_of_speech);
   if (showOtherStems) {
     ensureStemJob({
       typed: typedWord || state.currentAddWord,
@@ -1579,6 +1601,7 @@ function renderResultSummary({ added = [], duplicates = [], check = null, typedW
   }
   $("#addModal").classList.remove("hidden");
   setAddModalKind("dup");
+  scaleDupModal(addedList.length + dupList.length);
   reviewKeep = true;
   if (!read().review) navigate({ review: true }, { silent: true });
   const addedDelay = 0;

@@ -12,6 +12,36 @@
   overflow: visible;
   padding: 28px 28px 22px;
 }
+.modal.add-modal.is-dup {
+  --dup-count: 3;
+  width: min(96vw, max(520px, calc(316px + var(--dup-count) * 68px)));
+  max-width: 96vw;
+  max-height: calc(100vh - 32px);
+  overflow: hidden;
+  padding: 28px 36px 24px;
+}
+.modal.add-modal.is-dup .dup-notice {
+  min-height: min(460px, calc(100vh - 96px));
+}
+.modal.add-modal.is-dup.is-dup-lg .dup-notice,
+.modal.add-modal.is-dup.is-dup-xl .dup-notice {
+  min-height: 0;
+}
+.modal.add-modal.is-dup.is-dup-lg .dup-grid {
+  gap: 10px 40px;
+}
+.modal.add-modal.is-dup.is-dup-lg .dup-word {
+  font-size: 2.05rem;
+}
+.modal.add-modal.is-dup.is-dup-xl .dup-grid {
+  gap: 8px 28px;
+}
+.modal.add-modal.is-dup.is-dup-xl .dup-word {
+  font-size: 1.7rem;
+}
+.modal.add-modal.is-dup .dup-section + .dup-section {
+  padding-top: 18px;
+}
 .modal.add-modal.is-deck {
   --reroll-aside-w: 300px;
   --reroll-aside-gap: 16px;
@@ -245,9 +275,13 @@
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, transparent 0%, rgba(201, 163, 90, 0.16) 50%, transparent 100%);
+  background: linear-gradient(90deg, transparent, var(--skel-shimmer), transparent);
   transform: translateX(100%);
   animation: skel-shimmer 1.45s ease-in-out infinite;
+}
+html[data-theme="light"] .skel::after {
+  inset: -18px 0;
+  filter: blur(14px);
 }
 .entry-col + .entry-col .skel::after {
   animation-delay: 0.18s;

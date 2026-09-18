@@ -9,6 +9,10 @@
   --accent: #d94a42;
   --accent-2: #c9a35a;
   --danger: #9a3330;
+  --on-accent: #faf6ef;
+  --overlay: rgba(8, 20, 12, 0.72);
+  --shemagh-opacity: 0.38;
+  --skel-shimmer: rgba(201, 163, 90, 0.16);
   --radius: 14px;
   --icon-chip-sm: 32px;
   --icon-chip-md: 40px;
@@ -18,6 +22,24 @@
   --flip-duration: 0.55s;
   --hold-fill: 1.3s;
   --title-font: 'Aref Ruqaa', serif;
+}
+
+html[data-theme="light"] {
+  --bg: #f4e9d2;
+  --surface: #fbf6ea;
+  --surface-2: #f0e4cc;
+  --border: #2c4434;
+  --text: #0c1b12;
+  --text-dim: #1b2e21;
+  --text-faint: #6d8272;
+  --accent: #c43c36;
+  --accent-2: #a67c35;
+  --danger: #9a3330;
+  --on-accent: #fffaf0;
+  --overlay: rgba(8, 20, 12, 0.42);
+  --shemagh-opacity: 0.22;
+  --skel-shimmer: rgba(255, 252, 246, 0.88);
+  color-scheme: light;
 }
 
 * { box-sizing: border-box; }
@@ -37,17 +59,17 @@ body {
 
 .shemagh-bg {
   position: fixed;
-  left: 0;
-  right: 0;
-  top: -30vh;
-  height: 200vh;
+  inset: 0;
   z-index: 0;
   pointer-events: none;
   background-image: url("../img/shemagh-tile.svg");
   background-size: 71px 71px;
   background-repeat: repeat;
-  will-change: transform;
-  opacity: 0.38;
+  will-change: background-position;
+  opacity: var(--shemagh-opacity);
+}
+html[data-theme="light"] .shemagh-bg {
+  background-image: url("../img/shemagh-tile-light.svg");
 }
 
 #app {
@@ -271,6 +293,11 @@ body {
   font-family: 'Noto Naskh Arabic', 'Inter', sans-serif;
 }
 #addWordInput:focus { outline: 2px solid var(--accent); }
+html[data-theme="light"] #addWordInput {
+  background: #f8efd8;
+  border-color: color-mix(in srgb, var(--border) 55%, var(--bg));
+  box-shadow: 0 1px 2px rgba(12, 27, 18, 0.08), 0 8px 22px rgba(12, 27, 18, 0.06);
+}
 
 .hero-batch-btn {
   flex: 0 0 auto;
@@ -280,7 +307,7 @@ body {
   border-radius: 999px;
   border: 1px solid var(--accent);
   background: var(--accent);
-  color: #faf6ef;
+  color: var(--on-accent);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -293,8 +320,8 @@ body {
   height: 28px;
 }
 .hero-batch-btn:hover {
-  background: #e2554c;
-  border-color: #e2554c;
+  background: color-mix(in srgb, var(--accent) 86%, #fff);
+  border-color: color-mix(in srgb, var(--accent) 86%, #fff);
 }
 .hero-batch-btn:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
 
@@ -306,7 +333,7 @@ body {
   cursor: pointer;
   font-weight: 600;
 }
-.btn.primary { background: var(--accent); color: #faf6ef; }
+.btn.primary { background: var(--accent); color: var(--on-accent); }
 .btn.secondary { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
 .btn.small { padding: 6px 12px; font-size: 0.85rem; border-radius: 8px; }
 .btn.danger {
