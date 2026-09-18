@@ -15,6 +15,61 @@ function shouldApplyLearnedDate(incoming, current) {
   return !prev || next < prev;
 }
 
+function localDay(d = new Date()) {
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+
+function shiftDay(ymd, delta) {
+  const [y, m, d] = ymd.split("-").map(Number);
+  return localDay(new Date(y, m - 1, d + delta));
+}
+
+function livingIds(ids) {
+  return (ids || []).filter((id) => db.prepare("SELECT id FROM words WHERE id = ?").get(id));
+}
+
+function pickRandomIds(want, exclude) {
+  if (want <= 0) return [];
+  const skip = [...new Set((exclude || []).filter((id) => id != null))];
+  const sql = skip.length
+    ? `SELECT id FROM words WHERE id NOT IN (${skip.map(() => "?").join(",")}) ORDER BY RANDOM() LIMIT ?`
+    : "SELECT id FROM words ORDER BY RANDOM() LIMIT ?";
+  return db.prepare(sql).all(...skip, want).map((row) => row.id);
+}
+
+function dailyRandomEntries(count) {
+  const total = db.prepare("SELECT COUNT(*) AS n FROM words").get().n;
+  const want = Math.min(count, total);
+  if (want === 0) return [];
+
+  const day = localDay();
+  const row = db.prepare("SELECT word_ids FROM daily_picks WHERE day = ?").get(day);
+  let ids = livingIds(row ? JSON.parse(row.word_ids || "[]") : []);
+
+  if (ids.length < want) {
+    const avoid = livingIds(JSON.parse(
+      db.prepare("SELECT word_ids FROM daily_picks WHERE day = ?").get(shiftDay(day, -1))?.word_ids || "[]"
+    ));
+    const extra = pickRandomIds(want - ids.length, [...ids, ...avoid]);
+    ids = [...ids, ...extra];
+    if (ids.length < want) ids = [...ids, ...pickRandomIds(want - ids.length, ids)];
+    db.prepare(`
+      INSERT INTO daily_picks (day, word_ids) VALUES (?, ?)
+      ON CONFLICT(day) DO UPDATE SET word_ids = excluded.word_ids
+    `).run(day, JSON.stringify(ids));
+  } else if (ids.length > want) {
+    ids = ids.slice(0, want);
+    db.prepare(`
+      INSERT INTO daily_picks (day, word_ids) VALUES (?, ?)
+      ON CONFLICT(day) DO UPDATE SET word_ids = excluded.word_ids
+    `).run(day, JSON.stringify(ids));
+  }
+
+  return ids.map((id) => rowToEntry(db.prepare("SELECT * FROM words WHERE id = ?").get(id))).filter(Boolean);
+}
+
 function applyLearnedDateIfEarlier(id, date_learned) {
   const row = db.prepare("SELECT * FROM words WHERE id = ?").get(id);
   if (!row) return null;
@@ -148,8 +203,7 @@ function mountWordRoutes(app) {
 
   app.get("/api/random", (req, res) => {
     const count = Math.min(parseInt(req.query.count) || 3, 20);
-    const rows = db.prepare("SELECT * FROM words ORDER BY RANDOM() LIMIT ?").all(count);
-    res.json(rows.map(rowToEntry));
+    res.json(dailyRandomEntries(count));
   });
 
   app.get("/api/search", (req, res) => {

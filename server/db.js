@@ -27,6 +27,13 @@ if (!wordCols.includes("date_learned")) {
   db.exec(`ALTER TABLE words ADD COLUMN date_learned TEXT NOT NULL DEFAULT ''`);
 }
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS daily_picks (
+    day TEXT PRIMARY KEY,
+    word_ids TEXT NOT NULL DEFAULT '[]'
+  );
+`);
+
 // Vowels, tanween, sukoon, and other combining marks.
 // Kept, because they can be the only difference between distinct words:
 //   shadda (U+0651)  كتب vs كتّب
