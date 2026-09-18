@@ -137,7 +137,8 @@ function renderEditForm(entry, { keepRegen = true } = {}) {
       closeEditModal();
       await loadHome({ fromNav: true });
       await openCardDetail(entry.id, { saved: true, fromNav: true });
-      navigate({ card: entry.id, edit: null }, { replace: true, silent: true });
+      if (read().edit) navBack();
+      else navigate({ card: entry.id, edit: null }, { replace: true, silent: true });
     } catch (err) {
       alert(err.message || "Could not save");
     }
