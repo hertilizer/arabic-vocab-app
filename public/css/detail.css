@@ -239,7 +239,18 @@
   font-family: 'Noto Naskh Arabic', serif;
   font-size: 1.35rem;
 }
-.detail-block { margin-top: 22px; }
+.flip-back-meaning {
+  flex-direction: column;
+  gap: 18px;
+}
+.flip-back-meaning .detail-block {
+  margin-top: 0;
+  width: 100%;
+  text-align: center;
+}
+.flip-back-meaning .detail-kicker {
+  text-align: center;
+}
 .detail-kicker {
   font-size: 0.7rem;
   font-weight: 600;
@@ -250,8 +261,9 @@
 }
 .detail-notes {
   margin: 0;
-  color: var(--text);
+  color: var(--text-dim);
   line-height: 1.45;
+  text-align: center;
 }
 .detail-meaning,
 .detail-example {

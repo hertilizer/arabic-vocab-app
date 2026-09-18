@@ -207,7 +207,6 @@ export async function openCardDetail(id, { saved = false, entry = null, fromNav 
       </div>
       <div class="detail-primary${word.part_of_speech ? " has-pos-tip" : ""}" dir="rtl"${word.part_of_speech ? ` data-tooltip="${escapeHtml(word.part_of_speech)}" tabindex="0"` : ""}>${arHtml(word.word_ar)}</div>
       ${detailPairedHtml(word.word_ar_paired)}
-      ${notesBlock}
       <div class="detail-footer">
         <span class="detail-added">${escapeHtml(addedAgo(entryDisplayDate(word)))}</span>
         ${quietIconBtn({ icon: ICONS.edit, label: "Edit", id: "detailEditBtn" })}
@@ -223,6 +222,7 @@ export async function openCardDetail(id, { saved = false, entry = null, fromNav 
       </div>
       <div class="flip-back-pane flip-back-meaning">
         <p class="detail-meaning">${meaning}</p>
+        ${notesBlock}
       </div>
     </div>
   `;
