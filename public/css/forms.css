@@ -170,6 +170,14 @@
 }
 .deck-card.is-tucking {
   z-index: 0;
+  overflow: visible;
+}
+.deck-card.is-tucking > .reroll-aside,
+.deck-card.is-next > .reroll-aside,
+.deck-card.is-back > .reroll-aside {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.42s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .deck-card.is-blank {
   background: var(--surface);
@@ -179,12 +187,24 @@
   z-index: 9;
   pointer-events: none;
   transition: none;
+  overflow: visible;
 }
 .deck-card.is-flying-add {
   animation: deck-fly-add 0.42s cubic-bezier(0.22, 0.8, 0.36, 1) forwards;
 }
 .deck-card.is-flying-skip {
   animation: deck-fly-skip 0.42s cubic-bezier(0.22, 0.8, 0.36, 1) forwards;
+}
+.reroll-aside.is-flying-skip,
+.reroll-aside.is-flying-add {
+  z-index: 8;
+  pointer-events: none;
+}
+.reroll-aside.is-flying-skip {
+  animation: aside-fly-skip 0.34s cubic-bezier(0.12, 0.72, 0.28, 1) forwards;
+}
+.reroll-aside.is-flying-add {
+  animation: aside-fly-add 0.54s cubic-bezier(0.22, 0.8, 0.36, 1) forwards;
 }
 .deck-card .entry-form {
   display: flex;
@@ -243,6 +263,20 @@
 }
 @keyframes deck-fly-skip {
   to { transform: translateX(-118%) rotate(-12deg); opacity: 0; }
+}
+@keyframes aside-fly-skip {
+  from { transform: none; opacity: 1; }
+  to {
+    transform: translateX(calc(-1 * (var(--deck-w, 980px) + var(--reroll-aside-w, 300px) + var(--reroll-aside-gap, 16px)))) rotate(-6deg);
+    opacity: 0;
+  }
+}
+@keyframes aside-fly-add {
+  from { transform: none; opacity: 1; }
+  to {
+    transform: translateX(calc(0.62 * var(--deck-w, 980px))) rotate(5deg);
+    opacity: 0;
+  }
 }
 
 .entry-kicker {
@@ -800,6 +834,8 @@
 @media (prefers-reduced-motion: reduce) {
   .modal.add-modal.is-deck { transition: none; }
   .reroll-aside { animation: none; }
+  .reroll-aside.is-flying-skip,
+  .reroll-aside.is-flying-add { opacity: 0; }
   .skel::after { animation: none; }
 }
 

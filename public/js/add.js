@@ -3,7 +3,7 @@ import { api } from "./lib/api.js";
 import { state } from "./lib/state.js";
 import { ICONS, quietIconBtn } from "./lib/icons.js";
 import { stripHarakat } from "./lib/harakat.js";
-import { regenExpandHtml, currentRegenNote, isRegenOpen, bindRegenExpand, collapseRegenOnPointerDown, stripAutofillExisting, attachRegenMeta, attachFieldRegen, mountRegenAside } from "./lib/regen.js";
+import { regenExpandHtml, currentRegenNote, isRegenOpen, bindRegenExpand, collapseRegenOnPointerDown, stripAutofillExisting, attachRegenMeta, attachFieldRegen, mountRegenAside, adoptRegenAside } from "./lib/regen.js";
 import { loadHome } from "./home.js";
 import { openCardDetail } from "./detail.js";
 import { noteWordAdded } from "./export.js";
@@ -931,6 +931,23 @@ async function showCurrentDeckItem() {
   if (!item.guess) await fillItem(item);
 }
 
+function flyingRegenAside(top) {
+  const layout = top?.closest(".deck-layout") || $(".deck-layout");
+  if (!layout) return null;
+  const aside = layout.querySelector(":scope > .reroll-aside") || top?.querySelector(":scope > .reroll-aside");
+  if (aside && aside.parentElement !== layout) layout.appendChild(aside);
+  return aside;
+}
+
+function startAsideFly(aside, kind) {
+  if (!aside) return;
+  aside.style.animation = "none";
+  aside.classList.remove("is-flying-skip", "is-flying-add");
+  void aside.offsetWidth;
+  aside.style.removeProperty("animation");
+  aside.classList.add(`is-flying-${kind}`);
+}
+
 function waitCardAnim(card, ms = 450) {
   return new Promise((resolve) => {
     let done = false;
@@ -940,7 +957,11 @@ function waitCardAnim(card, ms = 450) {
       resolve();
     };
     card.addEventListener("animationend", (e) => {
-      if (e.target === card) finish();
+      if (e.target !== card) return;
+      const name = String(e.animationName || "");
+      if (!/fly|tuck|blank/i.test(name)) return;
+      if (e.elapsedTime < 0.12) return;
+      finish();
     });
     setTimeout(finish, ms);
   });
@@ -985,6 +1006,9 @@ function syncDeckLayout() {
   const layout = $(".deck-layout");
   scene.style.setProperty("--deck-h", `${h}px`);
   layout?.style.setProperty("--deck-h", `${h}px`);
+  const w = `${Math.round(scene.getBoundingClientRect().width)}px`;
+  scene.style.setProperty("--deck-w", w);
+  layout?.style.setProperty("--deck-w", w);
   top.style.height = "";
 }
 
@@ -1083,15 +1107,21 @@ async function dismissTop(kind) {
   const top = $(".deck-card.is-top");
   const next = $(".deck-card.is-next");
   if (!top) return;
+  const aside = flyingRegenAside(top);
   batchAnimating = true;
   top.classList.remove("is-top");
   top.classList.add(`is-flying-${kind}`);
+  startAsideFly(aside, kind);
   if (next) {
     next.classList.remove("is-next");
     next.classList.add("is-top");
     next.removeAttribute("inert");
   }
-  await waitCardAnim(top, 430);
+  await Promise.all([
+    waitCardAnim(top, 450),
+    aside ? waitCardAnim(aside, kind === "add" ? 580 : 360) : Promise.resolve()
+  ]);
+  aside?.remove();
   top.remove();
 }
 
@@ -1130,6 +1160,7 @@ async function tuckTopToBack() {
   const next = $(".deck-card.is-next");
   if (!top || !next || !scene) return;
   batchAnimating = true;
+  const aside = adoptRegenAside(top);
   const toBack = $$(".deck-card", scene).length > 2;
   scene.appendChild(top);
   void top.offsetWidth;
@@ -1139,6 +1170,7 @@ async function tuckTopToBack() {
   next.classList.add("is-top");
   next.removeAttribute("inert");
   await Promise.all([waitCardTransition(next, 430), waitCardTransition(top, 430)]);
+  aside?.remove();
 }
 
 async function afterDeckChange() {

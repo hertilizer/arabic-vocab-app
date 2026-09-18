@@ -72,6 +72,13 @@ function setAsideOpen(host, on) {
   host.closest(".modal")?.classList.toggle("has-reroll-aside", on);
 }
 
+export function adoptRegenAside(card) {
+  const layout = card?.closest(".deck-layout") || $(".deck-layout");
+  const aside = layout?.querySelector(":scope > .reroll-aside");
+  if (card && aside) card.appendChild(aside);
+  return aside;
+}
+
 export function mountRegenAside(host, guess) {
   if (!host) return;
   const note = String(guess?.reroll_note || "").trim();
