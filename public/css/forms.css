@@ -14,11 +14,15 @@
 }
 .modal.add-modal.is-dup {
   --dup-count: 3;
-  width: min(96vw, max(520px, calc(316px + var(--dup-count) * 68px)));
+  width: min(96vw, 520px);
   max-width: 96vw;
   max-height: calc(100vh - 32px);
   overflow: hidden;
   padding: 28px 36px 24px;
+}
+.modal.add-modal.is-dup.is-dup-lg,
+.modal.add-modal.is-dup.is-dup-xl {
+  width: min(96vw, max(520px, calc(280px + var(--dup-count) * 52px)));
 }
 .modal.add-modal.is-dup .dup-notice {
   min-height: min(460px, calc(100vh - 96px));

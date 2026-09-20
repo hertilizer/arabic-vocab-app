@@ -3,7 +3,7 @@ import { api } from "./lib/api.js";
 import { state } from "./lib/state.js";
 import { ICONS, quietIconBtn } from "./lib/icons.js";
 import { stripHarakat } from "./lib/harakat.js";
-import { regenExpandHtml, currentRegenNote, isRegenOpen, bindRegenExpand, collapseRegenOnPointerDown, stripAutofillExisting, attachRegenMeta, attachFieldRegen, mountRegenAside, mountDeckAsides, adoptRegenAside, revealWaitingAside, promoteWaitingAside } from "./lib/regen.js";
+import { regenExpandHtml, currentRegenNote, isRegenOpen, bindRegenExpand, collapseRegenOnPointerDown, stripAutofillExisting, attachRegenMeta, attachFieldRegen, mountRegenAside, mountDeckAsides, adoptRegenAside, revealWaitingAside, promoteWaitingAside, resetRegenControl } from "./lib/regen.js";
 import { formOptions } from "./lib/form.js";
 import { loadHome } from "./home.js";
 import { openCardDetail } from "./detail.js";
@@ -42,8 +42,8 @@ function scaleDupModal(count) {
   if (!modal) return;
   const n = Math.max(count, 1);
   modal.style.setProperty("--dup-count", String(n));
-  modal.classList.toggle("is-dup-lg", n >= 6);
-  modal.classList.toggle("is-dup-xl", n >= 12);
+  modal.classList.toggle("is-dup-lg", n >= 8);
+  modal.classList.toggle("is-dup-xl", n >= 14);
 }
 
 function formRoot() {
@@ -1132,11 +1132,13 @@ function deckCardHtml(item, i) {
 }
 
 function bindTopCard(card, item) {
-  if (!card || card.dataset.bound === "1") return;
+  if (!card) return;
   if (item?.guess) {
     state.currentAddGuess = item.guess;
     state.currentAddWord = item.typed;
   }
+  resetRegenControl(card);
+  if (card.dataset.bound === "1") return;
   if (!state.currentAddGuess) return;
   card.dataset.bound = "1";
   bindEntryForm(card);
@@ -1156,10 +1158,13 @@ function refreshDeckCard(item) {
   const sameReady = item.guess && card.dataset.ready === "1" && card.dataset.uid === String(item.uid);
   if (sameReady && idx === 0 && card.dataset.bound === "1") {
     writeGuessFields(item.guess, card);
+    resetRegenControl(card);
     syncDeckAsides();
     return;
   }
   if (sameReady && idx > 0) {
+    writeGuessFields(item.guess, card);
+    resetRegenControl(card);
     syncDeckAsides();
     return;
   }

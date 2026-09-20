@@ -204,6 +204,20 @@ export function setRegenOpen(open, root = document) {
   else if (document.activeElement === input) input.blur();
 }
 
+export function resetRegenControl(root = document) {
+  const wrap = $(".regen-expand", root);
+  const btn = $("[data-regen-toggle]", root);
+  const input = $(".regen-note", root);
+  if (btn) {
+    btn.disabled = false;
+    btn.classList.remove("is-spinning");
+  }
+  if (input) {
+    input.readOnly = false;
+    input.tabIndex = wrap?.classList.contains("is-open") ? 0 : -1;
+  }
+}
+
 function waitForRegenClose(wrap) {
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return Promise.resolve();
   return new Promise((resolve) => {
@@ -261,7 +275,11 @@ export function bindRegenExpand(root, { getExisting, applyGuess, stillActive, st
       setRegenOpen(false, root);
       btn.disabled = true;
       await waitForRegenClose(wrap);
-      startRegen({ note, existing });
+      try {
+        await startRegen({ note, existing });
+      } finally {
+        resetRegenControl(root);
+      }
       return;
     }
     btn.classList.add("is-spinning");
