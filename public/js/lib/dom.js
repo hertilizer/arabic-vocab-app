@@ -17,10 +17,14 @@ export function addedAgo(dateAdded) {
   }
   if (Number.isNaN(then.getTime())) return "";
   const startOf = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const days = Math.round((startOf(new Date()) - startOf(then)) / 86400000);
-  if (days <= 0) return "today";
-  if (days === 1) return "1 day ago";
-  return `${days} days ago`;
+  const now = new Date();
+  const days = Math.round((startOf(now) - startOf(then)) / 86400000);
+  if (days <= 0) return "Today";
+  if (days === 1) return "Yesterday";
+  if (days < 7) return then.toLocaleDateString("en-US", { weekday: "long" });
+  const twoMonthsAgo = startOf(new Date(now.getFullYear(), now.getMonth() - 2, now.getDate()));
+  if (then >= twoMonthsAgo) return then.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return then.toLocaleDateString("en-US", { month: "short", year: "numeric" });
 }
 
 export function entryDisplayDate(entry) {
